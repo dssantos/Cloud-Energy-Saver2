@@ -1,0 +1,3 @@
+*.txt
+.ces2/
+__pycache__/
