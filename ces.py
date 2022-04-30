@@ -1,8 +1,4 @@
-#coding: utf-8
-
-# Cloud Energy Saver
-# Host state manager for OpenStack Cloud Computing environments that allows for power management experiments
-# https://github.com/dssantos/Cloud-Energy-Saver
+#!/usr/bin/env python
 
 import sys
 
