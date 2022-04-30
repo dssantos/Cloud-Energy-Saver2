@@ -1,3 +1,4 @@
-*.txt
+compute*.txt
 .ces2/
 __pycache__/
+.vscode
