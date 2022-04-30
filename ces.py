@@ -2,16 +2,22 @@
 
 import sys
 
-
-if len(sys.argv) <= 1:
-
-	print('Enter some parameter!\nHelp:\n./ces -h ')
-
-else:
+try:
 	arg1 = sys.argv[1]
+except:
+    arg1 = 'empty'
 
-	if arg1 == '--help' or arg1 == '-h':
-		help_msg = '''
+valid_params = [
+	'-r', '--registrator',
+	'-v', '--verifier',
+	'-i', '--instantiato',
+	'-on', '--on',
+	'-off', '--off',
+	'-s', '--status',
+]
+
+if arg1 not in valid_params:
+    help_msg = '''
 #####  Cloud Energy Saver (CES) #####
 Host state manager for OpenStack Cloud Computing environments that allows for power management experiments
 
@@ -20,7 +26,6 @@ Syntax:
 
 Options and Parameters:
 
-	-h,   --help                        shows this help
 	-r,   --registrator                 identifies and registers hosts
 	-v,   --verifier [MAX] [MED]        starts idle and overload check
 	                                    MAX and MED are percentages of RAM in use on Compute hosts and represent the limits that define when to start hosts (when the environment is above MAX) or turn off hosts (when the environment is below the MED)
@@ -29,19 +34,15 @@ Options and Parameters:
 	-off, --off [QT]                    shut offs quantity [QT] of instances
 	-s,   --status                      shows information about Compute hosts
 		'''
-		print(help)
-	else:
-
+    print(help_msg)
+    
+else:
+	try:
 		import registrator, verifier, status, instances
-
-		
 		if len(sys.argv) > 2:
 			arg2 = int(sys.argv[2])
-
-
 		if arg1 == '--registrator' or arg1 == '-r':
 			registrator.run()
-
 		if arg1 == '--verifier' or arg1 == '-v':
 			if len(sys.argv) > 3:
 				lim_max = int(sys.argv[2])
@@ -87,5 +88,5 @@ Options and Parameters:
 						print('VMs: %s\n' %host['vms'])
 					except:
 						pass
-		# except:
-		# 	print("Something is wrong with the OpenStack environment or this computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver")
+	except:
+		print("Something is wrong with the OpenStack environment or this computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
