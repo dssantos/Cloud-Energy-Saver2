@@ -1,4 +1,5 @@
-compute*.txt
+*.txt
+!requirements.txt
 .ces2/
 __pycache__/
 .vscode
