@@ -37,3 +37,9 @@ python ces.py --on 5
 # Only off 5 VMS
 python ces.py --off 5
 ```
+
+### Start checking loads and manage hosts state
+```bash
+# Set threshold of loads to manage hosts
+python ces.py --verifier 70 30
+```
