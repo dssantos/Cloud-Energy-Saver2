@@ -19,3 +19,21 @@ pip install -r requirements.txt
 python ces.py --registrator
 
 ```
+
+### Show current status of Compute nodes
+```bash
+python ces.py --status
+
+```
+
+### Initialize VMs to create load on cloud environment
+```bash
+# auto on and off 50 VMs 
+python ces.py --instantiator 50
+
+# Only on 5 VMs
+python ces.py --on 5
+
+# Only off 5 VMS
+python ces.py --off 5
+```
