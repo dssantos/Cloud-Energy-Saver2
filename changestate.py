@@ -1,15 +1,17 @@
 #coding: utf-8
 
-import subprocess, mac
+import mac
 from subprocess import Popen, PIPE, STDOUT
+
+from wakeonlan import send_magic_packet
+
 
 def wake(host):
 
 	mac_list = mac.get(host)
 	mac_address = ''
 	for mac_address in mac_list:
-		command = "sudo etherwake -i eno1 %s" %mac_address
-		output = subprocess.check_output(command, shell=True)
+		send_magic_packet(mac_address.decode(), interface="10.0.0.0")
 
 def shutdown(host):
 
