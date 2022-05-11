@@ -10,7 +10,7 @@ except:
 valid_params = [
 	'-r', '--registrator',
 	'-v', '--verifier',
-	'-i', '--instantiato',
+	'-i', '--instantiator',
 	'-on', '--on',
 	'-off', '--off',
 	'-s', '--status',
