@@ -2,9 +2,10 @@
 from time import sleep
 import sys, status, changestate, ast
 
-import workload
+import workload, predict
 
-def run(lim_max, lim_med):
+
+def run(lim_max, lim_med, predict_model):
 	
 	hosts = status.get()
 	ram = []
@@ -25,7 +26,13 @@ def run(lim_max, lim_med):
 			workload.save(host['hostname'])
 			if host['vms'] > 0:
 				running.append(host['hostname']) # Inserts the hosts that are connected (and have VMs) in an list of actives
-				ram.append(host['ram']) # Captures memory consumption and inserts into a list
+				if predict_model == 'default':
+					ram.append(host['ram'])
+				elif predict_model == 'naive':
+					print(f'Running {predict_model} predict model')
+					ram.append(predict.naive(host['hostname']))
+				else:
+					print(f'Predict model "{predict_model}" not supported yet, running default mode')
 			else:
 				idle.append(host['hostname']) # Inserts hosts that are running (and do not have VMs) in a list of idlers
 		else:
@@ -72,12 +79,12 @@ def run(lim_max, lim_med):
 						print('desligando %s' %idle[i+1])
 						changestate.shutdown(idle[i+1])
 
-def start(lim_max, lim_med):
+def start(lim_max, lim_med, predict_model):
 		
     while True:
 
         print('\n\nVerificando Hosts...\n')
-        run(lim_max, lim_med)
+        run(lim_max, lim_med, predict_model)
 
         for i in range(90,-1,-1):
             print("  Próxima verificação: %3d\r"%i)
