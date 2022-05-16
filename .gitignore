@@ -1,5 +1,6 @@
 *.txt
 !requirements.txt
+*.csv
 .ces2/
 __pycache__/
 .vscode

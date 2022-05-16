@@ -1,6 +1,8 @@
 #coding: utf-8
 from time import sleep
-import time, sys, status, changestate, ast, mac
+import sys, status, changestate, ast
+
+import workload
 
 def run(lim_max, lim_med):
 	
@@ -18,21 +20,17 @@ def run(lim_max, lim_med):
 		print('É preciso registrar os hosts do ambiente')
 		registered = []
 
-	for host in hosts:	# Inserts the hosts that are connected (and have VMs) in an list of actives
+	for host in hosts:
 		if host['state'] == 'up':
+			workload.save(host['hostname'])
 			if host['vms'] > 0:
-				running.append(host['hostname'])
+				running.append(host['hostname']) # Inserts the hosts that are connected (and have VMs) in an list of actives
 				ram.append(host['ram']) # Captures memory consumption and inserts into a list
-
-	for host in hosts: # Inserts hosts that are running (and do not have VMs) in a list of idlers
-		if host['state'] == 'up':
-			if host['vms'] == 0:
-				idle.append(host['hostname'])
-
-	for host in hosts: # Inserts hosts that are shut down (and registered) in an list of offline 
-		if host['state'] == 'down':
+			else:
+				idle.append(host['hostname']) # Inserts hosts that are running (and do not have VMs) in a list of idlers
+		else:
 			if host['hostname'] in registered:
-				offline.append(host['hostname'])
+				offline.append(host['hostname']) # Inserts hosts that are shut down (and registered) in an list of offline 
 
 	try:
 		ram_avg = sum(ram) / len(ram) # Calculates an average of memory in use by active hosts
