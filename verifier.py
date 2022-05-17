@@ -31,8 +31,12 @@ def run(lim_max, lim_med, predict_model):
 				elif predict_model == 'naive':
 					print(f'Running {predict_model} predict model')
 					ram.append(predict.naive(host['hostname']))
+				elif predict_model == 'arima':
+					print(f'Running {predict_model} predict model')
+					ram.append(predict.arima(host['hostname']))
 				else:
 					print(f'Predict model "{predict_model}" not supported yet, running default mode')
+					ram.append(host['ram'])
 			else:
 				idle.append(host['hostname']) # Inserts hosts that are running (and do not have VMs) in a list of idlers
 		else:
