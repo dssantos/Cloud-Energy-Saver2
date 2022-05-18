@@ -42,4 +42,10 @@ python ces.py --off 5
 ```bash
 # Set threshold of loads to manage hosts
 python ces.py --verifier 70 30
+
+# OR Manage hosts with arima predict model
+python ces.py --verifier 70 30 arima
+
+# OR Manage hosts with lstm predict model
+python ces.py --verifier 70 30 lstm
 ```

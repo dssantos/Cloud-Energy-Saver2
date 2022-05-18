@@ -31,7 +31,7 @@ Options and Parameters:
 	-r,   --registrator                 	identifies and registers hosts
 	-v,   --verifier [MAX] [MED] [MODEL]    starts idle and overload check
 	                                    	MAX and MED are percentages of RAM in use on Compute hosts and represent the limits that define when to start hosts (when the environment is above MAX) or turn off hosts (when the environment is below the MED)
-											MODEL (optional): default, naive or arima. Example: python ces.py -v 70 30 arima
+											MODEL (optional): default, naive, arima or lstm. Example: python ces.py -v 70 30 arima
 	-i,   --instantiator [QT]           	starts a [QT] number of instances one by one, every 30 seconds, and then shut down one by one, continuously
 	-on,  --on [QT]                     	starts a quantity [QT] of instances
 	-off, --off [QT]                    	shut offs quantity [QT] of instances

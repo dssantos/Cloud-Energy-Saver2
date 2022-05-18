@@ -34,6 +34,9 @@ def run(lim_max, lim_med, predict_model):
 				elif predict_model == 'arima':
 					print(f'Running {predict_model} predict model')
 					ram.append(predict.arima(host['hostname']))
+				elif predict_model == 'lstm':
+					print(f'Running {predict_model} predict model')
+					ram.append(predict.lstm(host['hostname']))
 				else:
 					print(f'Predict model "{predict_model}" not supported yet, running default mode')
 					ram.append(host['ram'])
