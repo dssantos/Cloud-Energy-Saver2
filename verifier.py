@@ -1,6 +1,8 @@
 #coding: utf-8
+import os
 from time import sleep
 import sys, status, changestate, ast
+import threading
 
 import workload, predict
 
@@ -23,7 +25,6 @@ def run(lim_max, lim_med, predict_model):
 
 	for host in hosts:
 		if host['state'] == 'up':
-			workload.save(host['hostname'])
 			if host['vms'] > 0:
 				running.append(host['hostname']) # Inserts the hosts that are connected (and have VMs) in an list of actives
 				if predict_model == 'default':
@@ -87,13 +88,17 @@ def run(lim_max, lim_med, predict_model):
 						changestate.shutdown(idle[i+1])
 
 def start(lim_max, lim_med, predict_model):
-		
-    while True:
 
-        print('\n\nVerificando Hosts...\n')
-        run(lim_max, lim_med, predict_model)
+	print('\n\nIniciando coleta de cargas de trabalho...\n')
+	hosts = status.get()
+	for host in hosts:
+		threading.Thread(target=workload.save, args=[host['hostname']]).start()
 
-        for i in range(90,-1,-1):
-            print("  Próxima verificação: %3d\r"%i)
-            sleep(1)
-            sys.stdout.flush()
+	while True:
+		print('\n\nVerificando Hosts...\n')
+		run(lim_max, lim_med, predict_model)
+
+		for i in range(90,-1,-1):
+			print("  Próxima verificação: %3d\r"%i)
+			sleep(1)
+			sys.stdout.flush()
