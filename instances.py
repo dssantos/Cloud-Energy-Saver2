@@ -3,10 +3,6 @@ import json
 
 import requests, header, subprocess, time, sys
 
-r = requests.get('http://controller:8774/v2.1/servers', headers=header.get())
-vm_list = json.loads(r.content) # Returns the content of the queried URL
-vm_list = vm_list['servers']
-length = len(vm_list)
 
 def get():
 	vms = []
@@ -75,3 +71,12 @@ def auto_on(limit):
 			print('desligando %s' %vm)
 			command = "ssh user@controller '. admin-openrc && openstack server delete %s'" %vm
 			run = subprocess.check_output(command, shell=True)  # Receives the output of the above command
+
+try:
+	r = requests.get('http://controller:8774/v2.1/servers', headers=header.get())
+except requests.exceptions.ConnectionError as e:
+	raise requests.exceptions.ConnectionError(f"{e}: This computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
+
+vm_list = json.loads(r.content) # Returns the content of the queried URL
+vm_list = vm_list['servers']
+length = len(vm_list)
