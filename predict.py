@@ -1,3 +1,5 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from datetime import datetime, timedelta
 
 from statsmodels.tsa.arima.model import ARIMA
