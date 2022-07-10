@@ -3,7 +3,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from datetime import datetime, timedelta
 
 from statsmodels.tsa.arima.model import ARIMA
-from numpy import array
+from numpy import array, concatenate
 from keras.models import Sequential
 from keras.layers import LSTM
 from keras.layers import Dense
@@ -34,6 +34,11 @@ def arima(hostname):
         predict = ram_usage.get(hostname)
     return predict
 
+def split_dataframes(df):
+    df = df.reset_index()
+    dataframes = [g.set_index('time_stamp', drop=True) for k,g  in df.groupby((~(df.time_stamp.diff().dt.total_seconds().fillna(0) < 240)).cumsum())]
+    return dataframes
+
 def split_sequence(sequence, n_steps):
     X, y = list(), list()
     for i in range(len(sequence)):
@@ -48,6 +53,20 @@ def split_sequence(sequence, n_steps):
         y.append(seq_y)
     return array(X), array(y)
 
+def concatenate_samples(full_df, n_steps):
+    Xs = []
+    ys = []
+    for df in split_dataframes(full_df):
+        if len(df) > n_steps + 1:
+            df_arr = df['mem'].values
+            X, y = split_sequence(df_arr, n_steps)
+            Xs.append(X)
+            ys.append(y)
+    Xsample = concatenate((Xs))
+    ysample = concatenate((ys))
+    
+    return Xsample, ysample, df_arr
+
 def lstm(hostname):
     '''
     Vanila LSTM model adapted from:
@@ -55,18 +74,15 @@ def lstm(hostname):
     Available from https://machinelearningmastery.com/how-to-develop-lstm-models-for-time-series-forecasting/, 
     accessed May 17th, 2022.
     '''
-    #create array
+    # get data workload
     df = workload.get(hostname)
-    df1 = df['mem']
-    df_arr = df1.values
 
     # choose a number of time steps
-    n_steps = 3
+    n_steps = 10
 
-    # define input sequence
-    raw_seq = df_arr
     # split into samples
-    X, y = split_sequence(raw_seq, n_steps)
+    X, y, df_arr = concatenate_samples(df, n_steps)
+
     # reshape from [samples, timesteps] into [samples, timesteps, features]
     n_features = 1
     try:
