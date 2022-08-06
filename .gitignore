@@ -1,6 +1,7 @@
 *.txt
 !requirements.txt
 *.csv
+models/
 .ces2/
 __pycache__/
 .vscode

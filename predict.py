@@ -1,12 +1,14 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from datetime import datetime, timedelta
+from random import choice
 
 from statsmodels.tsa.arima.model import ARIMA
 from numpy import array, concatenate
 from keras.models import Sequential
 from keras.layers import LSTM
 from keras.layers import Dense
+from keras.models import load_model
 
 import workload, ram_usage
 
@@ -67,6 +69,40 @@ def concatenate_samples(full_df, n_steps):
     
     return Xsample, ysample, df_arr
 
+def loss_average(history, epochs):
+    second_half_loss = history.history['loss'][epochs//2:]
+    return sum(second_half_loss) / len(second_half_loss)
+
+def train_lstm_model(hostname):
+    epochs = choice([50, 100, 150, 200, 250, 300, 350, 400, 450, 500])
+    # get data workload
+    df = workload.get(hostname)
+
+    # choose a number of time steps
+    n_steps = 10
+
+    # split into samples
+    X, y, df_arr = concatenate_samples(df, n_steps)
+    # reshape from [samples, timesteps] into [samples, timesteps, features]
+    n_features = 1
+    X = X.reshape((X.shape[0], X.shape[1], n_features))
+    # split train and test
+    Xtrain, Xtest = X[:-10], X[-10:]
+    ytrain, ytest = y[:-10], y[-10:]
+    # define model
+    model = Sequential()
+    model.add(LSTM(50, activation='relu', input_shape=(n_steps, n_features)))
+    model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mse')
+    # fit model
+    history = model.fit(Xtrain, ytrain, epochs=epochs, verbose=0, validation_data=(Xtest, ytest))
+    # save model named as loss value
+    loss = loss_average(history, epochs)
+    model.save(f'models/{hostname}/{loss} {epochs}')
+
+    return model
+
+
 def lstm(hostname):
     '''
     Vanila LSTM model adapted from:
@@ -85,18 +121,18 @@ def lstm(hostname):
 
     # reshape from [samples, timesteps] into [samples, timesteps, features]
     n_features = 1
+    # demonstrate prediction
+    x_input = array(df_arr[-n_steps:])
+    x_input = x_input.reshape((1, n_steps, n_features))
     try:
-        X = X.reshape((X.shape[0], X.shape[1], n_features))
-        # define model
-        model = Sequential()
-        model.add(LSTM(50, activation='relu', input_shape=(n_steps, n_features)))
-        model.add(Dense(1))
-        model.compile(optimizer='adam', loss='mse')
-        # fit model
-        model.fit(X, y, epochs=200, verbose=0)
-        # demonstrate prediction
-        x_input = array(df_arr[-n_steps:])
-        x_input = x_input.reshape((1, n_steps, n_features))
+        try:
+            models = [f for f in os.listdir(f'./models/{hostname}')]
+            best_model = sorted(models)[0]
+            print(best_model)
+            model = load_model(f'models/{hostname}/{best_model}')
+        except FileNotFoundError:
+            model = train_lstm_model(hostname)
+
         predict = model.predict(x_input, verbose=0)[0][0]
     except IndexError:
         print('Insufficient data to use lstm model.\nUsing default mode.')
