@@ -116,15 +116,15 @@ def lstm(hostname):
     # choose a number of time steps
     n_steps = 10
 
-    # split into samples
-    X, y, df_arr = concatenate_samples(df, n_steps)
-
-    # reshape from [samples, timesteps] into [samples, timesteps, features]
-    n_features = 1
-    # demonstrate prediction
-    x_input = array(df_arr[-n_steps:])
-    x_input = x_input.reshape((1, n_steps, n_features))
     try:
+        # split into samples
+        X, y, df_arr = concatenate_samples(df, n_steps)
+
+        # reshape from [samples, timesteps] into [samples, timesteps, features]
+        n_features = 1
+        # demonstrate prediction
+        x_input = array(df_arr[-n_steps:])
+        x_input = x_input.reshape((1, n_steps, n_features))
         try:
             models = [f for f in os.listdir(f'./models/{hostname}')]
             best_model = sorted(models)[0]
@@ -134,7 +134,9 @@ def lstm(hostname):
             model = train_lstm_model(hostname)
 
         predict = model.predict(x_input, verbose=0)[0][0]
-    except IndexError:
+        print(x_input)
+        print(predict, hostname)
+    except (IndexError, ValueError):
         print('Insufficient data to use lstm model.\nUsing default mode.')
         predict = ram_usage.get(hostname)
 
