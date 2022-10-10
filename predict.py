@@ -2,6 +2,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from datetime import datetime, timedelta
 from random import choice
+import threading
 
 from statsmodels.tsa.arima.model import ARIMA
 from numpy import array, concatenate
@@ -74,33 +75,44 @@ def loss_average(history, epochs):
     return sum(second_half_loss) / len(second_half_loss)
 
 def train_lstm_model(hostname):
-    epochs = choice([50, 100, 150, 200, 250, 300, 350, 400, 450, 500])
-    # get data workload
-    df = workload.get(hostname)
+    try:
+        epochs = choice([50, 100, 150, 200, 250, 300, 350, 400, 450, 500])
+        # get data workload
+        df = workload.get(hostname)
 
-    # choose a number of time steps
-    n_steps = 10
+        # choose a number of time steps
+        n_steps = 10
 
-    # split into samples
-    X, y, df_arr = concatenate_samples(df, n_steps)
-    # reshape from [samples, timesteps] into [samples, timesteps, features]
-    n_features = 1
-    X = X.reshape((X.shape[0], X.shape[1], n_features))
-    # split train and test
-    Xtrain, Xtest = X[:-10], X[-10:]
-    ytrain, ytest = y[:-10], y[-10:]
-    # define model
-    model = Sequential()
-    model.add(LSTM(50, activation='relu', input_shape=(n_steps, n_features)))
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss='mse')
-    # fit model
-    history = model.fit(Xtrain, ytrain, epochs=epochs, verbose=0, validation_data=(Xtest, ytest))
-    # save model named as loss value
-    loss = loss_average(history, epochs)
-    model.save(f'models/{hostname}/{loss} {epochs}')
+        # split into samples
+        X, y, df_arr = concatenate_samples(df, n_steps)
+        # reshape from [samples, timesteps] into [samples, timesteps, features]
+        n_features = 1
+        X = X.reshape((X.shape[0], X.shape[1], n_features))
+        # split train and test
+        split_index = len(X)*2//3
+        Xtrain, Xtest = X[:-split_index], X[-split_index:]
+        ytrain, ytest = y[:-split_index], y[-split_index:]
+        # define model
+        model = Sequential()
+        model.add(LSTM(50, activation='relu', input_shape=(n_steps, n_features)))
+        model.add(Dense(1))
+        model.compile(optimizer='adam', loss='mse')
+        # fit model
+        history = model.fit(Xtrain, ytrain, epochs=epochs, verbose=0, validation_data=(Xtest, ytest))
+        # save model named as loss value
+        loss = loss_average(history, epochs)
+        time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
+        model.save(f'models/{hostname}/{loss} {time_stamp} {epochs}')
 
-    return model
+        return 
+    except:
+        print('Unable to train now')
+
+def select_best_model(hostname):
+    models = [f for f in os.listdir(f'./models/{hostname}')]
+    best_model = sorted(models)[0]
+    
+    return best_model
 
 
 def lstm(hostname):
@@ -116,27 +128,33 @@ def lstm(hostname):
     # choose a number of time steps
     n_steps = 10
 
-    try:
-        # split into samples
-        X, y, df_arr = concatenate_samples(df, n_steps)
-
-        # reshape from [samples, timesteps] into [samples, timesteps, features]
-        n_features = 1
-        # demonstrate prediction
-        x_input = array(df_arr[-n_steps:])
-        x_input = x_input.reshape((1, n_steps, n_features))
+    last_df = split_dataframes(df)[-1]
+    if len(last_df) > 10 and len(df) > 100:
         try:
-            models = [f for f in os.listdir(f'./models/{hostname}')]
-            best_model = sorted(models)[0]
-            print(best_model)
-            model = load_model(f'models/{hostname}/{best_model}')
-        except FileNotFoundError:
-            model = train_lstm_model(hostname)
+            # split into samples
+            X, y, df_arr = concatenate_samples(df, n_steps)
 
-        predict = model.predict(x_input, verbose=0)[0][0]
-        print(x_input)
-        print(predict, hostname)
-    except (IndexError, ValueError):
+            # reshape from [samples, timesteps] into [samples, timesteps, features]
+            n_features = 1
+            # demonstrate prediction
+            x_input = array(df[-n_steps:].mem.values)
+            x_input = x_input.reshape((1, n_steps, n_features))
+            try:
+                threading.Thread(target=train_lstm_model, args=[hostname]).start()
+                
+                best_model = select_best_model(hostname)
+                print(best_model)
+                model = load_model(f'models/{hostname}/{best_model}')
+            except FileNotFoundError:
+                model = train_lstm_model(hostname)
+
+            predict = model.predict(x_input, verbose=0)[0][0]
+            print(x_input)
+            print(predict, hostname)
+        except (IndexError, ValueError, AttributeError):
+            print('Insufficient data to use lstm model.\nUsing default mode.')
+            predict = ram_usage.get(hostname)
+    else:
         print('Insufficient data to use lstm model.\nUsing default mode.')
         predict = ram_usage.get(hostname)
 
