@@ -3,6 +3,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from datetime import datetime, timedelta
 from random import choice
 import threading
+import shutil
 
 from statsmodels.tsa.arima.model import ARIMA
 from numpy import array, concatenate
@@ -10,6 +11,7 @@ from keras.models import Sequential
 from keras.layers import LSTM
 from keras.layers import Dense
 from keras.models import load_model
+from keras.callbacks import ModelCheckpoint
 
 import workload, ram_usage
 
@@ -81,7 +83,7 @@ def train_lstm_model(hostname):
         df = workload.get(hostname)
 
         # choose a number of time steps
-        n_steps = 10
+        n_steps = 50
 
         # split into samples
         X, y, df_arr = concatenate_samples(df, n_steps)
@@ -97,21 +99,30 @@ def train_lstm_model(hostname):
         model.add(LSTM(50, activation='relu', input_shape=(n_steps, n_features)))
         model.add(Dense(1))
         model.compile(optimizer='adam', loss='mse')
+        # create a model check point
+        filepath = f'models/{hostname}/weights-{epochs:02d}.hdf5'
+        checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
+        callbacks_list = [checkpoint]
         # fit model
-        history = model.fit(Xtrain, ytrain, epochs=epochs, verbose=0, validation_data=(Xtest, ytest))
+        history = model.fit(Xtrain, ytrain, epochs=epochs, verbose=0, validation_data=(Xtest, ytest),callbacks=callbacks_list)
         # save model named as loss value
         loss = loss_average(history, epochs)
+        loss = '.'.join([str(loss).split('.')[0].zfill(3), str(loss).split('.')[-1]])
         time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
+        model.load_weights(filepath)
         model.save(f'models/{hostname}/{loss} {time_stamp} {epochs}')
 
-        return 
+        return model
     except:
         print('Unable to train now')
 
 def select_best_model(hostname):
-    models = [f for f in os.listdir(f'./models/{hostname}')]
+    models = [f for f in os.listdir(f'./models/{hostname}') if not f.endswith('hdf5')]
+    if len(models) > 10:
+        shutil.rmtree(f'./models/{hostname}/{sorted(models)[-2]}')
+        shutil.rmtree(f'./models/{hostname}/{sorted(models)[-1]}')
     best_model = sorted(models)[0]
-    
+
     return best_model
 
 
@@ -126,10 +137,10 @@ def lstm(hostname):
     df = workload.get(hostname)
 
     # choose a number of time steps
-    n_steps = 10
+    n_steps = 50
 
     last_df = split_dataframes(df)[-1]
-    if len(last_df) > 10 and len(df) > 100:
+    if len(last_df) > 50 and len(df) > 100:
         try:
             # split into samples
             X, y, df_arr = concatenate_samples(df, n_steps)
@@ -144,13 +155,24 @@ def lstm(hostname):
                 
                 best_model = select_best_model(hostname)
                 print(best_model)
-                model = load_model(f'models/{hostname}/{best_model}')
+                file_path = f'models/{hostname}/{best_model}'
+                model = load_model(file_path)
+
+                predict = model.predict(x_input, verbose=0)[0][0]
+                print(x_input)
+                print(predict, hostname)
+                default_predict = ram_usage.get(hostname)
+                if abs(predict - default_predict) > 15:
+                    print(f'Deleting {file_path}')
+                    shutil.rmtree(file_path)
+                    print(f'Trying another model...')
+                    model = train_lstm_model(hostname)
+                    predict = model.predict(x_input, verbose=0)[0][0]
+                    print(x_input)
+                    print(predict, hostname)
             except FileNotFoundError:
                 model = train_lstm_model(hostname)
-
-            predict = model.predict(x_input, verbose=0)[0][0]
-            print(x_input)
-            print(predict, hostname)
+                predict = model.predict(x_input, verbose=0)[0][0]
         except (IndexError, ValueError, AttributeError):
             print('Insufficient data to use lstm model.\nUsing default mode.')
             predict = ram_usage.get(hostname)
