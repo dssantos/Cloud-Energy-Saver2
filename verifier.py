@@ -27,22 +27,22 @@ def run(lim_max, lim_med, predict_model):
 		if host['state'] == 'up':
 			if host['vms'] > 0:
 				running.append(host['hostname']) # Inserts the hosts that are connected (and have VMs) in an list of actives
-				if predict_model == 'default':
-					ram.append(host['ram'])
-				elif predict_model == 'naive':
-					print(f'Running {predict_model} predict model')
-					ram.append(predict.naive(host['hostname']))
-				elif predict_model == 'arima':
-					print(f'Running {predict_model} predict model')
-					ram.append(predict.arima(host['hostname']))
-				elif predict_model == 'lstm':
-					print(f'Running {predict_model} predict model')
-					ram.append(predict.lstm(host['hostname']))
-				else:
-					print(f'Predict model "{predict_model}" not supported yet, running default mode')
-					ram.append(host['ram'])
 			else:
 				idle.append(host['hostname']) # Inserts hosts that are running (and do not have VMs) in a list of idlers
+			if predict_model == 'default':
+				ram.append(host['ram'])
+			elif predict_model == 'naive':
+				print(f'Running {predict_model} predict model')
+				ram.append(predict.naive(host['hostname']))
+			elif predict_model == 'arima':
+				print(f'Running {predict_model} predict model')
+				ram.append(predict.arima(host['hostname']))
+			elif predict_model == 'lstm':
+				print(f'Running {predict_model} predict model')
+				ram.append(predict.lstm(host['hostname']))
+			else:
+				print(f'Predict model "{predict_model}" not supported yet, running default mode')
+				ram.append(host['ram'])
 		else:
 			if host['hostname'] in registered:
 				offline.append(host['hostname']) # Inserts hosts that are shut down (and registered) in an list of offline 
