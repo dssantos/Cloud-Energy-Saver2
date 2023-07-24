@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+from time import sleep
 
 import registrator, verifier, status, instances
 
@@ -74,17 +75,22 @@ else:
 		else:
 			print('Enter a quantity of VMs to shut down\nEx: python ces.py -off 5')
 	if arg1 == '--status' or arg1 == '-s':
-		hosts = status.get()
-		if len(hosts) < 1:
-			print("There are no registered Compute hosts!\nRun 'python ces.py -r' to register them")
-		else:
-			print("[Compute Hosts Status]\n")
-			for host in hosts:
-				print('%s [%s]' %(host['hostname'], host['state']))
-				print('RAM: {} %'.format(host['ram']))
-				try:
-					print('VMs: %s\n' %host['vms'])
-				except:
-					pass
+		while True:
+			try:
+				hosts = status.get()
+				if len(hosts) < 1:
+					print("There are no registered Compute hosts!\nRun 'python ces.py -r' to register them")
+				else:
+					print("[Compute Hosts Status]\n")
+					for host in hosts:
+						print('%s [%s]' %(host['hostname'], host['state']))
+						print('RAM: {} %'.format(host['ram']))
+						try:
+							print('VMs: %s\n' %host['vms'])
+						except:
+							pass
+			except:
+				pass
+			sleep(10)
 	# except:
 	# 	print("Something is wrong with the OpenStack environment or this computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
