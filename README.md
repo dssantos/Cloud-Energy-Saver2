@@ -20,6 +20,8 @@ pip install -r requirements.txt
 
 The system controls VirtualBox VMs (controller, compute1, compute2, compute3) running on Windows host via SSH.
 
+![Topology](https://raw.githubusercontent.com/dssantos/Cloud-Energy-Saver/refs/heads/master/topologia.png)
+
 ### 1. Configure Network
 ```bash
 sudo ip addr add 10.0.0.100/24 dev <network_interface>
