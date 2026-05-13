@@ -52,12 +52,6 @@ cat ~/.ssh/id_ed25519.pub | ssh <windows_user>@<windows_host> "mkdir -p ~/.ssh &
 ssh <windows_user>@<windows_host> "VBoxManage list vms"
 ```
 
-### 3. Configure .env File
-```env
-WINDOWS_HOST=<windows_host_ip>
-WINDOWS_USER=<windows_username>
-```
-
 ### Test VM Start
 ```bash
 ssh <windows_user>@<windows_host> "VBoxManage startvm <vm_name> --type=headless"
@@ -86,6 +80,11 @@ source .ces2/bin/activate
 pip install -U pip
 pip install -r requirements.txt
 
+# Configure .env file (copy from example and update values)
+cp .env.example .env
+# Edit .env with your Windows host IP and username:
+# WINDOWS_HOST=<windows_host_ip>
+# WINDOWS_USER=<windows_username>
 ```
 
 ---
