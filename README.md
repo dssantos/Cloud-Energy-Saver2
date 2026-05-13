@@ -12,6 +12,55 @@ pip install -r requirements.txt
 
 ```
 
+---
+
+## Remote Windows VirtualBox Setup (REQUIRED)
+
+**Complete this setup before running any commands below.**
+
+The system controls VirtualBox VMs (controller, compute1, compute2, compute3) running on Windows host via SSH.
+
+### 1. Configure Network
+```bash
+sudo ip addr add 10.0.0.100/24 dev <network_interface>
+```
+
+### 2. Setup SSH to Windows
+```bash
+# Generate key
+ssh-keygen -t ed25519
+
+# Copy to Windows
+cat ~/.ssh/id_ed25519.pub | ssh <windows_user>@<windows_host> "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+
+# Test
+ssh <windows_user>@<windows_host> "VBoxManage list vms"
+```
+
+### 3. Configure .env File
+```env
+WINDOWS_HOST=<windows_host_ip>
+WINDOWS_USER=<windows_username>
+```
+
+### 4. Download and Import Pre-configured VMs
+
+Download pre-configured VirtualBox images (controller + compute) from:
+[OpenStack VMs](https://mega.nz/#F!TbBmSA4b!YHuaruKoxMUFtyM6OXNsWQ)
+
+After downloading:
+1. Unzip the downloaded files
+2. In VirtualBox on Windows: File → Import Appliance → Select the .ova files
+3. Clone the compute VM to create compute2 and compute3 (right-click → Clone)
+4. Ensure VMs are named: controller, compute1, compute2, compute3
+
+### Test VM Start
+```bash
+ssh <windows_user>@<windows_host> "VBoxManage startvm <vm_name> --type=headless"
+```
+
+---
+
 ## How to use
 
 ### Find and registry compute hosts
