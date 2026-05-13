@@ -14,12 +14,18 @@ The Cloud Energy Saver (CES) controls VirtualBox VMs (controller, compute1, comp
 
 ### Download and Import Pre-configured VMs
 
-Download pre-configured VirtualBox images (controller + compute) from:
+Download pre-configured VirtualBox images and documentation from:
 [OpenStack VMs](https://mega.nz/#F!TbBmSA4b!YHuaruKoxMUFtyM6OXNsWQ)
 
-After downloading:
-1. Unzip the downloaded files
-2. In VirtualBox on Windows: File → Import Appliance → Select the .ova files
+The link opens a cloud folder with the following files:
+- **Controller.vdi** - VM disk with Ubuntu 16.04 server and OpenStack configured
+- **ComputeVM.vdi** - VM disk for compute nodes
+- **ComputePen.raw** - Hard drive image to clone to USB drive
+- **README.txt** - Detailed OpenStack configuration instructions
+
+After accessing:
+1. Download the .vdi files from the cloud folder
+2. In VirtualBox on Windows: Machine → New → Create new VM → Use existing disk (.vdi files)
 3. Clone the compute VM to create compute2 and compute3 (right-click → Clone)
 4. Ensure VMs are named: controller, compute1, compute2, compute3
 
