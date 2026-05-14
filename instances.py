@@ -53,9 +53,9 @@ def auto_on(limit):
 		vms = []
 		for x in range(limit):
 			for i in range(60,-1,-1):
-				print("Liga em: %3d\r"%i,)
-				time.sleep(1)
+				sys.stdout.write("Liga em: %3d\r"%i,)
 				sys.stdout.flush()
+				time.sleep(1)
 			vm = 'vm-%s'%pos
 			pos += 1
 			print('ligando %s' %vm)
@@ -65,10 +65,10 @@ def auto_on(limit):
 
 		for vm in reversed(vms):
 			for i in range(60,-1,-1):
-				print("Desliga em: %3d\r"%i,)
-				time.sleep(1)
+				sys.stdout.write("Desliga em: %3d\r"%i,)
 				sys.stdout.flush()
-			print('desligando %s' %vm)
+				time.sleep(1)
+			print('desligando %s   ' %vm)
 			command = "ssh user@controller '. admin-openrc && openstack server delete %s'" %vm
 			run = subprocess.check_output(command, shell=True)  # Receives the output of the above command
 
