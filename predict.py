@@ -29,10 +29,10 @@ with redirect_stderr(stderr_capture):
     from statsmodels.tsa.arima.model import ARIMA
     from numpy import array, concatenate
     from keras.models import Sequential
-    from keras.layers import LSTM
-    from keras.layers import Dense
+    from keras.layers import LSTM, Dense, Dropout
     from keras.models import load_model
     from keras.callbacks import ModelCheckpoint
+    import keras.optimizers
 
 import workload, ram_usage
 
@@ -97,59 +97,94 @@ def loss_average(history, epochs):
     second_half_loss = history.history['loss'][epochs//2:]
     return sum(second_half_loss) / len(second_half_loss)
 
+def random_hyperparameters():
+    """Generate random hyperparameters for LSTM training."""
+    return {
+        'n_steps': choice([10, 15, 20, 30, 50]),  # Focus on recent data
+        'lstm_units': choice([64, 128, 256]),
+        'epochs': choice([50, 100, 150, 200, 250, 300, 400]),
+        'batch_size': choice([8, 16, 32, 64]),
+        'dropout': choice([0.1, 0.2, 0.5]),
+        'learning_rate': choice([0.001, 0.002, 0.005])
+    }
+
 def train_lstm_model(hostname):
     try:
-        epochs = choice([50, 100, 150, 200, 250, 300, 350, 400, 450, 500])
-        # get data workload
+        # Get random hyperparameters
+        hp = random_hyperparameters()
+        n_steps = hp['n_steps']
+        lstm_units = hp['lstm_units']
+        epochs = hp['epochs']
+        batch_size = hp['batch_size']
+        dropout = hp['dropout']
+        learning_rate = hp['learning_rate']
+
+        # Get data workload
         df = workload.get(hostname)
 
-        # choose a number of time steps
-        n_steps = 50
-
-        # split into samples
+        # Split into samples
         X, y, df_arr = concatenate_samples(df, n_steps)
         # reshape from [samples, timesteps] into [samples, timesteps, features]
         n_features = 1
         X = X.reshape((X.shape[0], X.shape[1], n_features))
-        # split train and test
-        split_index = len(X)*2//3
-        Xtrain, Xtest = X[:-split_index], X[-split_index:]
-        ytrain, ytest = y[:-split_index], y[-split_index:]
-        # define model
+
+        # Split train and validation (80/20)
+        split_index = len(X) * 8 // 10
+        Xtrain, Xval = X[:split_index], X[split_index:]
+        ytrain, yval = y[:split_index], y[split_index:]
+
+        # Define model with dropout
         model = Sequential()
-        model.add(LSTM(50, activation='relu', input_shape=(n_steps, n_features)))
+        model.add(LSTM(lstm_units, input_shape=(n_steps, n_features)))
+        model.add(Dropout(dropout))
         model.add(Dense(1))
-        model.compile(optimizer='adam', loss='mse')
-        # create a model check point
+
+        # Custom optimizer with learning rate
+        opt = keras.optimizers.Adam(learning_rate=learning_rate)
+        model.compile(optimizer=opt, loss='mse')
+
+        # Model checkpoint
         filepath = f'models/{hostname}/weights-{epochs:02d}.h5'
-        checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
+        checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=0,
+                                     save_best_only=True, save_weights_only=False, mode='auto')
         callbacks_list = [checkpoint]
-        # fit model
-        history = model.fit(Xtrain, ytrain, epochs=epochs, verbose=0, validation_data=(Xtest, ytest),callbacks=callbacks_list)
-        # save model named as loss value
-        loss = loss_average(history, epochs)
-        loss = '.'.join([str(loss).split('.')[0].zfill(3), str(loss).split('.')[-1]])
+
+        # Fit model with validation split
+        history = model.fit(Xtrain, ytrain, epochs=epochs, batch_size=batch_size,
+                           verbose=0, validation_data=(Xval, yval), callbacks=callbacks_list)
+
+        # Save model named as validation loss value
+        val_loss = history.history['val_loss'][-1]
+        val_loss = '.'.join([str(val_loss).split('.')[0].zfill(3),
+                            str(val_loss).split('.')[-1][:6]])  # Keep 6 decimal places
         time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
+
         model.load_weights(filepath)
-        model.save(f'models/{hostname}/{loss}_{time_stamp}_{epochs}.keras')
+        model.save(f'models/{hostname}/{val_loss}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}.keras')
 
         return model
     except Exception as e:
         print(f'Unable to train now: {e}')
 
 def select_best_model(hostname):
-    """Select best model based on actual loss value, not filename."""
+    """Select best model based on validation loss value."""
     model_dir = f'./models/{hostname}'
     models = [f for f in os.listdir(model_dir) if f.endswith('.keras')]
 
     if not models:
         return None
 
-    # Parse loss from filenames (format: {loss}_{timestamp}_{epochs}.keras)
+    # Parse validation loss from filenames (format: {val_loss}_{timestamp}_{epochs}_{n_steps}_{units}.keras)
     model_losses = []
     for model_file in models:
         try:
-            loss = float(model_file.split('_')[0])
+            # Try new format first
+            parts = model_file.split('_')
+            if len(parts) >= 4:
+                loss = float(parts[0])
+            else:
+                # Fallback to old format: {loss}_{timestamp}_{epochs}.keras
+                loss = float(parts[0])
             model_losses.append((loss, model_file))
         except (ValueError, IndexError):
             continue
@@ -157,7 +192,7 @@ def select_best_model(hostname):
     if not model_losses:
         return None
 
-    # Sort by loss and return best
+    # Sort by validation loss and return best
     model_losses.sort(key=lambda x: x[0])
     best_model = model_losses[0][1]
 
@@ -212,7 +247,7 @@ class LSTMTrainingManager:
         with self.cache_lock:
             if hostname in self.model_cache:
                 model, loss, timestamp = self.model_cache[hostname]
-                if (datetime.now() - timestamp).total_seconds() < 3600:
+                if (datetime.now() - timestamp).total_seconds() < 600:
                     return model
                 else:
                     del self.model_cache[hostname]
@@ -258,20 +293,29 @@ class LSTMTrainingManager:
 
                     if model:
                         # Validate prediction quality
-                        n_steps = 50
+                        # Get n_steps from best model filename, or default to 30
+                        try:
+                            best_file = select_best_model(hostname)
+                            if best_file:
+                                parts = best_file.split('_')
+                                n_steps = int(parts[3]) if len(parts) >= 4 else 30
+                            else:
+                                n_steps = 30
+                        except:
+                            n_steps = 30
                         x_input = array(df[-n_steps:].mem.values)
                         x_input = x_input.reshape((1, n_steps, 1))
                         predict = model.predict(x_input, verbose=0)[0][0]
                         actual = ram_usage.get(hostname)
 
-                        if abs(predict - actual) < 15:
+                        if abs(predict - actual) < 5:
                             best_file = select_best_model(hostname)
                             if best_file:
                                 loss = float(best_file.split('_')[0])
                                 with self.cache_lock:
                                     self.model_cache[hostname] = (model, loss, datetime.now())
 
-                sleep(60)  # Rate limit: max 1 train/minute/host
+                sleep(30)  # Rate limit: max 2 trains/minute/host
 
             except Exception as e:
                 print(f'Training error for {hostname}: {e}')
@@ -289,9 +333,16 @@ def lstm(hostname):
     if best_model:
         try:
             df = workload.get(hostname)
-            n_steps = 50
 
-            # Prepare input data (need at least 50 samples)
+            # Get n_steps from best model file
+            best_file = select_best_model(hostname)
+            if best_file:
+                parts = best_file.split('_')
+                n_steps = int(parts[3]) if len(parts) >= 4 else 30
+            else:
+                n_steps = 30
+
+            # Prepare input data (need at least n_steps samples)
             if len(df) >= n_steps:
                 n_features = 1
                 x_input = array(df[-n_steps:].mem.values)
