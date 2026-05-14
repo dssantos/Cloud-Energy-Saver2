@@ -108,6 +108,47 @@ def random_hyperparameters():
         'learning_rate': choice([0.001, 0.002, 0.005])
     }
 
+def update_model_loss(hostname, model_file, actual_loss):
+    """
+    Update model filename with new calculated loss.
+    Renames model to reflect actual prediction performance and updates timestamp.
+    """
+    if not model_file:
+        return None
+
+    model_dir = f'models/{hostname}'
+    old_path = f'{model_dir}/{model_file}'
+
+    try:
+        # Parse existing filename to get timestamp and hyperparameters
+        # Format: {val_loss}_{timestamp}_{epochs}_{n_steps}_{units}.keras
+        parts = model_file.replace('.keras', '').split('_')
+
+        if len(parts) < 4:
+            # Old format or invalid, skip
+            return None
+
+        # Update loss with new value
+        new_loss_str = str(actual_loss)
+        new_loss_str = '.'.join([new_loss_str.split('.')[0].zfill(3),
+                                  new_loss_str.split('.')[-1][:6]])
+
+        # Update timestamp to current time
+        new_timestamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
+
+        # Reconstruct filename with new loss and updated timestamp
+        new_filename = f'{new_loss_str}_{new_timestamp}_{parts[2]}_{parts[3]}_{parts[4]}.keras'
+        new_path = f'{model_dir}/{new_filename}'
+
+        # Rename the model file
+        os.rename(old_path, new_path)
+        print(f'[MODEL UPDATE] {hostname}: Renamed {model_file} -> {new_filename} (new loss: {actual_loss:.6f}, updated timestamp)')
+
+        return new_filename
+    except Exception as e:
+        print(f'[ERROR] Failed to rename model {model_file}: {e}')
+        return None
+
 def train_lstm_model(hostname):
     try:
         # Get random hyperparameters
@@ -118,6 +159,8 @@ def train_lstm_model(hostname):
         batch_size = hp['batch_size']
         dropout = hp['dropout']
         learning_rate = hp['learning_rate']
+
+        print(f'[TRAINING START] {hostname}: n_steps={n_steps}, units={lstm_units}, epochs={epochs}, batch={batch_size}, dropout={dropout}, lr={learning_rate}')
 
         # Get data workload
         df = workload.get(hostname)
@@ -160,11 +203,14 @@ def train_lstm_model(hostname):
         time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
 
         model.load_weights(filepath)
-        model.save(f'models/{hostname}/{val_loss}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}.keras')
+        filename = f'{val_loss}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}.keras'
+        model.save(f'models/{hostname}/{filename}')
+
+        print(f'[MODEL SAVED] {hostname}: {filename} (val_loss: {val_loss})')
 
         return model
     except Exception as e:
-        print(f'Unable to train now: {e}')
+        print(f'[TRAINING ERROR] {hostname}: Unable to train now: {e}')
 
 def select_best_model(hostname):
     """Select best model based on validation loss value."""
@@ -246,9 +292,41 @@ class LSTMTrainingManager:
         # Check cache first
         with self.cache_lock:
             if hostname in self.model_cache:
-                model, loss, timestamp = self.model_cache[hostname]
+                model, loss, filename, timestamp = self.model_cache[hostname]
                 if (datetime.now() - timestamp).total_seconds() < 600:
+                    print(f'[CACHE HIT] {hostname}: Using cached model {filename} (loss: {loss})')
                     return model
+                else:
+                    print(f'[CACHE EXPIRED] {hostname}: Model {filename} expired after {int((datetime.now() - timestamp).total_seconds())}s')
+                    del self.model_cache[hostname]
+
+        # Try loading from disk
+        try:
+            best_model_file = select_best_model(hostname)
+            if best_model_file:
+                model = load_model(f'models/{hostname}/{best_model_file}')
+                loss = float(best_model_file.split('_')[0])
+
+                with self.cache_lock:
+                    self.model_cache[hostname] = (model, loss, best_model_file, datetime.now())
+
+                print(f'[CACHE MISS] {hostname}: Loaded model {best_model_file} from disk (loss: {loss})')
+                return model
+            else:
+                print(f'[CACHE MISS] {hostname}: No model available on disk')
+        except Exception as e:
+            print(f'[CACHE ERROR] {hostname}: Failed to load model: {e}')
+
+        return None
+
+    def get_best_model_with_filename(self, hostname):
+        """Get best trained model with filename without blocking."""
+        # Check cache first
+        with self.cache_lock:
+            if hostname in self.model_cache:
+                model, loss, filename, timestamp = self.model_cache[hostname]
+                if (datetime.now() - timestamp).total_seconds() < 600:
+                    return model, filename
                 else:
                     del self.model_cache[hostname]
 
@@ -260,12 +338,13 @@ class LSTMTrainingManager:
                 loss = float(best_model_file.split('_')[0])
 
                 with self.cache_lock:
-                    self.model_cache[hostname] = (model, loss, datetime.now())
-                return model
+                    self.model_cache[hostname] = (model, loss, best_model_file, datetime.now())
+
+                return model, best_model_file
         except Exception:
             pass
 
-        return None
+        return None, None
 
     def stop_training(self, hostname=None):
         """Stop training thread(s). If hostname is None, stops all training threads."""
@@ -308,18 +387,34 @@ class LSTMTrainingManager:
                         predict = model.predict(x_input, verbose=0)[0][0]
                         actual = ram_usage.get(hostname)
 
-                        if abs(predict - actual) < 5:
+                        error = abs(predict - actual)
+
+                        if error < 5:
                             best_file = select_best_model(hostname)
                             if best_file:
+                                # Parse current loss from filename
+                                current_loss = float(best_file.split('_')[0])
+
+                                # Calculate new weighted loss (combine old with new error)
+                                # This smooths the loss over multiple predictions
+                                new_loss = (current_loss * 0.7) + (error * 0.3)
+
+                                # Update model filename with new loss
+                                new_filename = update_model_loss(hostname, best_file, new_loss)
+
+                                # Update cache
                                 loss = float(best_file.split('_')[0])
+                                filename = new_filename if new_filename else best_file
                                 with self.cache_lock:
-                                    self.model_cache[hostname] = (model, loss, datetime.now())
+                                    self.model_cache[hostname] = (model, loss, filename, datetime.now())
+
+                        print(f'[PREDICTION] {hostname}: predicted={predict:.2f}, actual={actual:.2f}, error={error:.2f}')
 
                 sleep(30)  # Rate limit: max 2 trains/minute/host
 
             except Exception as e:
-                print(f'Training error for {hostname}: {e}')
-                sleep(60)
+                print(f'[TRAINING ERROR] {hostname}: {e}')
+                sleep(30)
 
 
 def lstm(hostname):
@@ -328,19 +423,23 @@ def lstm(hostname):
     Never blocks on training operations - uses cached model or falls back gracefully.
     """
     # Check if a trained model is available
-    best_model = lstm_manager.get_best_model(hostname)
+    best_model, model_file = lstm_manager.get_best_model_with_filename(hostname)
 
     if best_model:
         try:
             df = workload.get(hostname)
 
-            # Get n_steps from best model file
-            best_file = select_best_model(hostname)
-            if best_file:
-                parts = best_file.split('_')
+            # Get n_steps and loss from model file
+            if model_file:
+                parts = model_file.split('_')
                 n_steps = int(parts[3]) if len(parts) >= 4 else 30
+                loss = float(parts[0]) if len(parts) >= 1 else 0
             else:
                 n_steps = 30
+                loss = 0
+                model_file = "unknown"
+
+            print(f'[PREDICTION START] {hostname}: Using model {model_file} (loss: {loss:.6f})')
 
             # Prepare input data (need at least n_steps samples)
             if len(df) >= n_steps:
@@ -349,7 +448,21 @@ def lstm(hostname):
                 x_input = x_input.reshape((1, n_steps, n_features))
 
                 predict = best_model.predict(x_input, verbose=0)[0][0]
-                print(f'LSTM prediction for {hostname}: {predict}')
+
+                # Check if prediction is coherent with last historical value
+                if len(df) > 0:
+                    last_value = df.iloc[-1]['mem']
+                    abs_diff = abs(predict - last_value)
+
+                    # Check if difference is > 15 units OR > 20% of last value
+                    if last_value > 0:  # Avoid division by zero
+                        pct_diff = (abs_diff / last_value) * 100
+                        if abs_diff > 15 or pct_diff > 20:
+                            actual_ram = ram_usage.get(hostname)
+                            print(f'[PREDICTION DISCREPANT] {hostname}: LSTM={predict:.2f}, Last={last_value:.2f}, Diff={abs_diff:.2f} ({pct_diff:.1f}%), Using RAM: {actual_ram:.2f}')
+                            return actual_ram
+
+                print(f'LSTM prediction for {hostname}: {predict:.2f} (model: {model_file})')
                 return predict
             else:
                 print(f'Insufficient data for LSTM prediction on {hostname}: {len(df)} samples, using current RAM')
