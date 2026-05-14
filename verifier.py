@@ -118,9 +118,10 @@ def start(lim_max, lim_med, predict_model):
 			run(lim_max, lim_med, predict_model)
 
 			for i in range(90,-1,-1):
-				print("  Próxima verificação: %3d\r"%i)
-				sleep(1)
+				sys.stdout.write("  Próxima verificação: %3d\r"%i)
 				sys.stdout.flush()
+				sleep(1)
+			print("  Próxima verificação:   0  ")
 	except KeyboardInterrupt:
 		if predict_model == 'lstm':
 			predict.lstm_manager.stop_training()
