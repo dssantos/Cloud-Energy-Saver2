@@ -100,7 +100,7 @@ def train_lstm_model(hostname):
         model.add(Dense(1))
         model.compile(optimizer='adam', loss='mse')
         # create a model check point
-        filepath = f'models/{hostname}/weights-{epochs:02d}.hdf5'
+        filepath = f'models/{hostname}/weights-{epochs:02d}.h5'
         checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
         callbacks_list = [checkpoint]
         # fit model
@@ -110,17 +110,17 @@ def train_lstm_model(hostname):
         loss = '.'.join([str(loss).split('.')[0].zfill(3), str(loss).split('.')[-1]])
         time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
         model.load_weights(filepath)
-        model.save(f'models/{hostname}/{loss} {time_stamp} {epochs}')
+        model.save(f'models/{hostname}/{loss}_{time_stamp}_{epochs}.keras')
 
         return model
-    except:
-        print('Unable to train now')
+    except Exception as e:
+        print(f'Unable to train now: {e}')
 
 def select_best_model(hostname):
-    models = [f for f in os.listdir(f'./models/{hostname}') if not f.endswith('hdf5')]
+    models = [f for f in os.listdir(f'./models/{hostname}') if f.endswith('.keras')]
     if len(models) > 10:
-        shutil.rmtree(f'./models/{hostname}/{sorted(models)[-2]}')
-        shutil.rmtree(f'./models/{hostname}/{sorted(models)[-1]}')
+        os.remove(f'./models/{hostname}/{sorted(models)[-2]}')
+        os.remove(f'./models/{hostname}/{sorted(models)[-1]}')
     best_model = sorted(models)[0]
 
     return best_model
@@ -164,7 +164,7 @@ def lstm(hostname):
                 default_predict = ram_usage.get(hostname)
                 if abs(predict - default_predict) > 15:
                     print(f'Deleting {file_path}')
-                    shutil.rmtree(file_path)
+                    os.remove(file_path)
                     print(f'Trying another model...')
                     model = train_lstm_model(hostname)
                     predict = model.predict(x_input, verbose=0)[0][0]
@@ -177,7 +177,7 @@ def lstm(hostname):
             print('Insufficient data to use lstm model.\nUsing default mode.')
             predict = ram_usage.get(hostname)
     else:
-        print('Insufficient data to use lstm model.\nUsing default mode.')
+        print(f'Insufficient data to use lstm model. {len(last_df)} {hostname}\nUsing default mode.')
         predict = ram_usage.get(hostname)
 
     return predict
