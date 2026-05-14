@@ -6,6 +6,8 @@ import threading
 
 import workload, predict
 
+lstm_manager = None
+
 
 def run(lim_max, lim_med, predict_model):
 	
@@ -88,17 +90,38 @@ def run(lim_max, lim_med, predict_model):
 						changestate.shutdown(idle[i+1])
 
 def start(lim_max, lim_med, predict_model):
+	global lstm_manager
 
+	# Initialize LSTM training manager if needed
+	if predict_model == 'lstm':
+		try:
+			with open("registered.txt", "r") as file:
+				registered = ast.literal_eval(file.read())
+
+			for hostname in registered:
+				predict.lstm_manager.start_training(hostname)
+
+			print(f'Started LSTM training for {len(registered)} hosts')
+		except Exception as e:
+			print(f'Error initializing LSTM training: {e}')
+
+	# Start workload collection
 	print('\n\nIniciando coleta de cargas de trabalho...\n')
 	hosts = status.get()
 	for host in hosts:
 		threading.Thread(target=workload.save, args=[host['hostname']]).start()
 
-	while True:
-		print('\n\nVerificando Hosts...\n')
-		run(lim_max, lim_med, predict_model)
+	# Main verification loop
+	try:
+		while True:
+			print('\n\nVerificando Hosts...\n')
+			run(lim_max, lim_med, predict_model)
 
-		for i in range(90,-1,-1):
-			print("  Próxima verificação: %3d\r"%i)
-			sleep(1)
-			sys.stdout.flush()
+			for i in range(90,-1,-1):
+				print("  Próxima verificação: %3d\r"%i)
+				sleep(1)
+				sys.stdout.flush()
+	except KeyboardInterrupt:
+		if predict_model == 'lstm':
+			predict.lstm_manager.stop_training()
+		raise

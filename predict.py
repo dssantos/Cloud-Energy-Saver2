@@ -1,17 +1,38 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-from datetime import datetime, timedelta
-from random import choice
-import threading
-import shutil
+import io
+import logging
+import warnings
+from contextlib import redirect_stderr
 
-from statsmodels.tsa.arima.model import ARIMA
-from numpy import array, concatenate
-from keras.models import Sequential
-from keras.layers import LSTM
-from keras.layers import Dense
-from keras.models import load_model
-from keras.callbacks import ModelCheckpoint
+# Suppress TensorFlow/Keras warnings BEFORE importing tensorflow/keras
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+# Suppress Python warnings from Keras and TensorFlow
+logging.getLogger('tensorflow').setLevel(logging.FATAL)
+logging.getLogger('keras').setLevel(logging.FATAL)
+logging.getLogger('absl').setLevel(logging.FATAL)
+warnings.filterwarnings('ignore', category=UserWarning, module='keras')
+warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
+warnings.filterwarnings('ignore', message='.*tf.function.*')
+
+# Capture and discard stderr during keras imports
+stderr_capture = io.StringIO()
+
+with redirect_stderr(stderr_capture):
+    from datetime import datetime, timedelta
+    from random import choice
+    import threading
+    from time import sleep
+
+    from statsmodels.tsa.arima.model import ARIMA
+    from numpy import array, concatenate
+    from keras.models import Sequential
+    from keras.layers import LSTM
+    from keras.layers import Dense
+    from keras.models import load_model
+    from keras.callbacks import ModelCheckpoint
 
 import workload, ram_usage
 
@@ -117,67 +138,179 @@ def train_lstm_model(hostname):
         print(f'Unable to train now: {e}')
 
 def select_best_model(hostname):
-    models = [f for f in os.listdir(f'./models/{hostname}') if f.endswith('.keras')]
-    if len(models) > 10:
-        os.remove(f'./models/{hostname}/{sorted(models)[-2]}')
-        os.remove(f'./models/{hostname}/{sorted(models)[-1]}')
-    best_model = sorted(models)[0]
+    """Select best model based on actual loss value, not filename."""
+    model_dir = f'./models/{hostname}'
+    models = [f for f in os.listdir(model_dir) if f.endswith('.keras')]
+
+    if not models:
+        return None
+
+    # Parse loss from filenames (format: {loss}_{timestamp}_{epochs}.keras)
+    model_losses = []
+    for model_file in models:
+        try:
+            loss = float(model_file.split('_')[0])
+            model_losses.append((loss, model_file))
+        except (ValueError, IndexError):
+            continue
+
+    if not model_losses:
+        return None
+
+    # Sort by loss and return best
+    model_losses.sort(key=lambda x: x[0])
+    best_model = model_losses[0][1]
+
+    # Keep only 5 best models, delete rest
+    for loss, worst_file in model_losses[5:]:
+        try:
+            os.remove(f'{model_dir}/{worst_file}')
+        except OSError:
+            pass
+
+    # Clean up intermediate weight files
+    for f in os.listdir(model_dir):
+        if f.startswith('weights-'):
+            try:
+                os.remove(f'{model_dir}/{f}')
+            except OSError:
+                pass
 
     return best_model
 
 
-def lstm(hostname):
-    '''
-    Vanila LSTM model adapted from:
-    Jason Brownlee, How to Develop LSTM Models for Time Series Forecasting, Machine Learning Mastery, 
-    Available from https://machinelearningmastery.com/how-to-develop-lstm-models-for-time-series-forecasting/, 
-    accessed May 17th, 2022.
-    '''
-    # get data workload
-    df = workload.get(hostname)
+class LSTMTrainingManager:
+    """Manages asynchronous LSTM training for multiple hosts.
+    Training runs continuously in background threads.
+    Predictions never wait for training to complete.
+    """
 
-    # choose a number of time steps
-    n_steps = 50
+    def __init__(self):
+        self.training_threads = {}
+        self.model_cache = {}
+        self.cache_lock = threading.Lock()
+        self.stop_event = threading.Event()
 
-    last_df = split_dataframes(df)[-1]
-    if len(last_df) > 50 and len(df) > 100:
+    def start_training(self, hostname):
+        """Start continuous training thread for a host."""
+        if hostname in self.training_threads and self.training_threads[hostname].is_alive():
+            return  # Already training
+
+        os.makedirs(f'models/{hostname}', exist_ok=True)
+
+        thread = threading.Thread(
+            target=self._training_loop,
+            args=[hostname],
+            daemon=True
+        )
+        thread.start()
+        self.training_threads[hostname] = thread
+
+    def get_best_model(self, hostname):
+        """Get best trained model without blocking."""
+        # Check cache first
+        with self.cache_lock:
+            if hostname in self.model_cache:
+                model, loss, timestamp = self.model_cache[hostname]
+                if (datetime.now() - timestamp).total_seconds() < 3600:
+                    return model
+                else:
+                    del self.model_cache[hostname]
+
+        # Try loading from disk
         try:
-            # split into samples
-            X, y, df_arr = concatenate_samples(df, n_steps)
+            best_model_file = select_best_model(hostname)
+            if best_model_file:
+                model = load_model(f'models/{hostname}/{best_model_file}')
+                loss = float(best_model_file.split('_')[0])
 
-            # reshape from [samples, timesteps] into [samples, timesteps, features]
-            n_features = 1
-            # demonstrate prediction
-            x_input = array(df[-n_steps:].mem.values)
-            x_input = x_input.reshape((1, n_steps, n_features))
+                with self.cache_lock:
+                    self.model_cache[hostname] = (model, loss, datetime.now())
+                return model
+        except Exception:
+            pass
+
+        return None
+
+    def stop_training(self, hostname=None):
+        """Stop training thread(s). If hostname is None, stops all training threads."""
+        if hostname:
+            if hostname in self.training_threads:
+                # Daemon threads will exit naturally
+                self.training_threads.pop(hostname, None)
+        else:
+            self.stop_event.set()
+            for thread in self.training_threads.values():
+                if thread.is_alive():
+                    thread.join(timeout=5)
+            self.stop_event.clear()
+            self.training_threads.clear()
+
+    def _training_loop(self, hostname):
+        """Continuous training loop running in background."""
+        while not self.stop_event.is_set():
             try:
-                threading.Thread(target=train_lstm_model, args=[hostname]).start()
-                
-                best_model = select_best_model(hostname)
-                print(best_model)
-                file_path = f'models/{hostname}/{best_model}'
-                model = load_model(file_path)
+                df = workload.get(hostname)
+                last_df = split_dataframes(df)[-1]
 
-                predict = model.predict(x_input, verbose=0)[0][0]
-                print(x_input)
-                print(predict, hostname)
-                default_predict = ram_usage.get(hostname)
-                if abs(predict - default_predict) > 15:
-                    print(f'Deleting {file_path}')
-                    os.remove(file_path)
-                    print(f'Trying another model...')
+                if len(last_df) > 50 and len(df) > 100:
                     model = train_lstm_model(hostname)
-                    predict = model.predict(x_input, verbose=0)[0][0]
-                    print(x_input)
-                    print(predict, hostname)
-            except FileNotFoundError:
-                model = train_lstm_model(hostname)
-                predict = model.predict(x_input, verbose=0)[0][0]
-        except (IndexError, ValueError, AttributeError):
-            print('Insufficient data to use lstm model.\nUsing default mode.')
-            predict = ram_usage.get(hostname)
-    else:
-        print(f'Insufficient data to use lstm model. {len(last_df)} {hostname}\nUsing default mode.')
-        predict = ram_usage.get(hostname)
 
-    return predict
+                    if model:
+                        # Validate prediction quality
+                        n_steps = 50
+                        x_input = array(df[-n_steps:].mem.values)
+                        x_input = x_input.reshape((1, n_steps, 1))
+                        predict = model.predict(x_input, verbose=0)[0][0]
+                        actual = ram_usage.get(hostname)
+
+                        if abs(predict - actual) < 15:
+                            best_file = select_best_model(hostname)
+                            if best_file:
+                                loss = float(best_file.split('_')[0])
+                                with self.cache_lock:
+                                    self.model_cache[hostname] = (model, loss, datetime.now())
+
+                sleep(60)  # Rate limit: max 1 train/minute/host
+
+            except Exception as e:
+                print(f'Training error for {hostname}: {e}')
+                sleep(60)
+
+
+def lstm(hostname):
+    """
+    Non-blocking LSTM prediction using best available model.
+    Never blocks on training operations - uses cached model or falls back gracefully.
+    """
+    # Check if a trained model is available
+    best_model = lstm_manager.get_best_model(hostname)
+
+    if best_model:
+        try:
+            df = workload.get(hostname)
+            n_steps = 50
+
+            # Prepare input data (need at least 50 samples)
+            if len(df) >= n_steps:
+                n_features = 1
+                x_input = array(df[-n_steps:].mem.values)
+                x_input = x_input.reshape((1, n_steps, n_features))
+
+                predict = best_model.predict(x_input, verbose=0)[0][0]
+                print(f'LSTM prediction for {hostname}: {predict}')
+                return predict
+            else:
+                print(f'Insufficient data for LSTM prediction on {hostname}: {len(df)} samples, using current RAM')
+                return ram_usage.get(hostname)
+
+        except (IndexError, ValueError, AttributeError) as e:
+            print(f'LSTM prediction failed for {hostname}: {e}')
+            return ram_usage.get(hostname)
+    else:
+        print(f'No trained model available for {hostname}, using current RAM')
+        return ram_usage.get(hostname)
+
+
+# Global training manager instance
+lstm_manager = LSTMTrainingManager()
