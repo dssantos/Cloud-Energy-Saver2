@@ -1,16 +1,137 @@
 #coding: utf-8
 import os
+import time
 from time import sleep
 from datetime import datetime
 import sys, status, changestate, ast
 import threading
+import smtplib
+from email.message import EmailMessage
+from dotenv import load_dotenv
 
 import workload, predict
 import event_logger
 from event_logger import Event
 
+# Load environment variables for email alerts
+load_dotenv()
+
 lstm_manager = None
 experiment_start_time = None
+
+
+def send_alert_email(hostname, target_state, timeout_seconds, details=None):
+    """
+    Send alert email when host fails to reach target state.
+    Application continues after sending alert.
+    """
+    try:
+        alert_email = os.getenv('ALERT_EMAIL')
+        app_password = os.getenv('ALERT_APP_PASSWORD')
+
+        if not alert_email or not app_password:
+            print('[ALERT] Email credentials not configured, skipping email notification')
+            return
+
+        msg = EmailMessage()
+        msg['Subject'] = f'CES ALERT: Host {hostname} failed to reach {target_state}'
+        msg['From'] = alert_email
+        msg['To'] = alert_email
+
+        # Collect maximum useful information
+        details_text = ""
+        if details:
+            details_text = f"\n\nDetails:\n{details}"
+
+        body = f"""
+CES Alert - Host State Change Timeout
+
+Host: {hostname}
+Target State: {target_state}
+Timeout: {timeout_seconds} seconds ({timeout_seconds//60} minutes)
+Timestamp: {datetime.now().isoformat()}
+
+Note: Application continues running despite this failure.{details_text}
+
+Please check the host and environment status.
+"""
+        msg.set_content(body)
+
+        # Enviar via Gmail SMTP
+        smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+
+        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp.starttls()
+        smtp.login(alert_email, app_password)
+        smtp.send_message(msg)
+        smtp.quit()
+        print(f'[ALERT] Email sent for host {hostname}')
+    except Exception as e:
+        print(f'[ALERT] Failed to send email: {e}')
+
+
+def wait_for_state_change(hostname, target_state, timeout=300, details_collector=None):
+    """
+    Wait for host to reach target state (up/down).
+    Max wait: 5 minutes (300 seconds).
+    On timeout: Send email alert and CONTINUE (don't exit).
+    Returns: True if successful, False if timeout (but continues)
+    """
+    print(f'[STATE] Aguardando {hostname} -> {target_state} (timeout: {timeout}s)...')
+    start_time = time.time()
+    check_interval = 10  # Check every 10 seconds
+
+    while time.time() - start_time < timeout:
+        hosts = status.get()
+        for host in hosts:
+            if host['hostname'] == hostname and host['state'] == target_state:
+                elapsed = time.time() - start_time
+                print(f'[STATE] {hostname} alcançou {target_state} em {elapsed:.1f}s')
+                return True
+        time.sleep(check_interval)
+
+    # Timeout - Send alert but DON'T exit
+    elapsed = time.time() - start_time
+    details = f"Elapsed time: {elapsed:.1f}s\nState transition did not complete within timeout."
+    print(f'[TIMEOUT] {hostname} não alcançou {target_state} em {timeout}s')
+    send_alert_email(hostname, target_state, timeout, details)
+
+    # Collect additional data for analysis
+    if details_collector:
+        details_collector.record_timeout(hostname, target_state, elapsed)
+
+    # Mark as failed but continue execution
+    return False
+
+
+def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
+    """
+    Calculate RAM average excluding overloaded hosts (RAM > lim_max).
+    Returns: (avg_ram, overloaded_list, normal_list)
+    """
+    ram_values = []
+    overloaded = []
+    normal = []
+
+    for host in hosts_data:
+        if host['state'] == 'up':
+            ram_val = host['ram']
+            if predict_model == 'lstm':
+                ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=6)
+            elif predict_model == 'naive':
+                ram_val = predict.naive(host['hostname'])
+            elif predict_model == 'arima':
+                ram_val = predict.arima(host['hostname'])
+
+            if ram_val > lim_max:
+                overloaded.append(host['hostname'])
+            else:
+                normal.append(host['hostname'])
+                ram_values.append(ram_val)
+
+    avg_ram = sum(ram_values) / len(ram_values) if ram_values else 0
+    return avg_ram, overloaded, normal
 
 
 def check_sla_violation(running_hosts, idle_hosts, offline_hosts, ram_avg, lim_max):
@@ -96,7 +217,6 @@ def log_final_state():
 def run(lim_max, lim_med, predict_model):
 
     hosts = status.get()
-    ram = []
     running = []
     idle = []
     offline = []
@@ -118,42 +238,19 @@ def run(lim_max, lim_med, predict_model):
                 running.append(host['hostname']) # Inserts the hosts that are connected (and have VMs) in an list of actives
             else:
                 idle.append(host['hostname']) # Inserts hosts that are running (and do not have VMs) in a list of idlers
-
-            actual_ram = host['ram']
-            if predict_model == 'default':
-                ram.append(actual_ram)
-            elif predict_model == 'naive':
-                print(f'Running {predict_model} predict model')
-                predicted = predict.naive(host['hostname'])
-                ram.append(predicted)
-                if predict_model == 'lstm':  # Shouldn't happen but keeping for consistency
-                    predictions[host['hostname']] = (predicted, actual_ram)
-            elif predict_model == 'arima':
-                print(f'Running {predict_model} predict model')
-                predicted = predict.arima(host['hostname'])
-                ram.append(predicted)
-                if predict_model == 'lstm':
-                    predictions[host['hostname']] = (predicted, actual_ram)
-            elif predict_model == 'lstm':
-                print(f'Running {predict_model} predict model')
-                predicted = predict.lstm(host['hostname'])
-                ram.append(predicted)
-                predictions[host['hostname']] = (predicted, actual_ram)
-            else:
-                print(f'Predict model "{predict_model}" not supported yet, running default mode')
-                ram.append(actual_ram)
         else:
             if host['hostname'] in registered:
                 offline.append(host['hostname']) # Inserts hosts that are shut down (and registered) in an list of offline
 
-    try:
-        ram_avg = sum(ram) / len(ram) # Calculates an average of memory in use by active hosts
-    except:
-        ram_avg = 0
+    # Calculate RAM average excluding overloaded hosts
+    hosts_for_avg = status.get()
+    ram_avg, overloaded, normal = calculate_ram_average(hosts_for_avg, lim_max, predict_model)
 
     print('ativos: ' + str(running))
     print('ociosos: ' + str(idle))
     print('offline: ' + str(offline))
+    print(f'sobrecarregados: {overloaded}')
+    print(f'normais: {normal}')
     print('média de ram: %s' %ram_avg)
 
 ## Logic of the management of the hosts to be turned on and off
@@ -273,7 +370,7 @@ def run(lim_max, lim_med, predict_model):
                         ))
                         changestate.shutdown(idle[i+1])
 
-def start(lim_max, lim_med, predict_model):
+def start(lim_max, lim_med, predict_model, continuous=False):
     global lstm_manager, experiment_start_time
 
     # Initialize event logger with model-specific filename
@@ -305,15 +402,21 @@ def start(lim_max, lim_med, predict_model):
 
     # Main verification loop
     try:
-        while True:
-            print('\n\nVerificando Hosts...\n')
-            run(lim_max, lim_med, predict_model)
-
-            for i in range(90,-1,-1):
-                sys.stdout.write("  Próxima verificação: %3d\r"%i)
-                sys.stdout.flush()
-                sleep(1)
-            print("  Próxima verificação:   0  ")
+        if continuous:
+            print('\n=== Modo Loop Contínuo ===')
+            print('Pressione Ctrl+C para parar\n')
+            while True:
+                run(lim_max, lim_med, predict_model)
+                sleep(1)  # Minimal delay for CPU
+        else:
+            # Original 90-second loop
+            while True:
+                run(lim_max, lim_med, predict_model)
+                for i in range(90,-1,-1):
+                    sys.stdout.write("  Próxima verificação: %3d\r"%i)
+                    sys.stdout.flush()
+                    sleep(1)
+                print("  Próxima verificação:   0  ")
     except KeyboardInterrupt:
         print('\n\nStopping verifier...')
         # Log final state before exiting

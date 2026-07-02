@@ -65,32 +65,41 @@ def split_dataframes(df):
     dataframes = [g.set_index('time_stamp', drop=True) for k,g  in df.groupby((~(df.time_stamp.diff().dt.total_seconds().fillna(0) < 240)).cumsum())]
     return dataframes
 
-def split_sequence(sequence, n_steps):
+def split_sequence(sequence, n_steps, steps_ahead=1):
+    """
+    Split sequence into input/output samples.
+    steps_ahead: How many steps ahead to predict (1=next, 6=3min)
+    """
     X, y = list(), list()
     for i in range(len(sequence)):
         # find the end of this pattern
         end_ix = i + n_steps
+        # find the target position (steps ahead)
+        target_ix = end_ix + steps_ahead - 1
         # check if we are beyond the sequence
-        if end_ix > len(sequence)-1:
+        if target_ix >= len(sequence):
             break
         # gather input and output parts of the pattern
-        seq_x, seq_y = sequence[i:end_ix], sequence[end_ix]
+        seq_x, seq_y = sequence[i:end_ix], sequence[target_ix]
         X.append(seq_x)
         y.append(seq_y)
     return array(X), array(y)
 
-def concatenate_samples(full_df, n_steps):
+def concatenate_samples(full_df, n_steps, steps_ahead=1):
+    """Concatenate samples with configurable prediction horizon."""
     Xs = []
     ys = []
     for df in split_dataframes(full_df):
-        if len(df) > n_steps + 1:
+        # Need enough data: n_steps input + steps_ahead target
+        min_length = n_steps + steps_ahead
+        if len(df) > min_length:
             df_arr = df['mem'].values
-            X, y = split_sequence(df_arr, n_steps)
+            X, y = split_sequence(df_arr, n_steps, steps_ahead)
             Xs.append(X)
             ys.append(y)
     Xsample = concatenate((Xs))
     ysample = concatenate((ys))
-    
+
     return Xsample, ysample, df_arr
 
 def loss_average(history, epochs):
@@ -121,7 +130,7 @@ def update_model_loss(hostname, model_file, actual_loss):
 
     try:
         # Parse existing filename to get timestamp and hyperparameters
-        # Format: {val_loss}_{timestamp}_{epochs}_{n_steps}_{units}.keras
+        # Format: {val_loss}_{timestamp}_{epochs}_{n_steps}_{units}_{steps_ahead}ahead.keras
         parts = model_file.replace('.keras', '').split('_')
 
         if len(parts) < 4:
@@ -137,7 +146,14 @@ def update_model_loss(hostname, model_file, actual_loss):
         new_timestamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
 
         # Reconstruct filename with new loss and updated timestamp
-        new_filename = f'{new_loss_str}_{new_timestamp}_{parts[2]}_{parts[3]}_{parts[4]}.keras'
+        # Handle both old format (5 parts) and new format (6 parts with steps_ahead)
+        if len(parts) >= 6 and parts[5].endswith('ahead'):
+            steps_ahead = parts[5].replace('ahead', '')
+            new_filename = f'{new_loss_str}_{new_timestamp}_{parts[2]}_{parts[3]}_{parts[4]}_{steps_ahead}ahead.keras'
+        else:
+            # Old format without steps_ahead
+            new_filename = f'{new_loss_str}_{new_timestamp}_{parts[2]}_{parts[3]}_{parts[4]}.keras'
+
         new_path = f'{model_dir}/{new_filename}'
 
         # Rename the model file
@@ -149,7 +165,8 @@ def update_model_loss(hostname, model_file, actual_loss):
         print(f'[ERROR] Failed to rename model {model_file}: {e}')
         return None
 
-def train_lstm_model(hostname):
+def train_lstm_model(hostname, steps_ahead=6):
+    """Train LSTM model with configurable prediction horizon."""
     try:
         # Get random hyperparameters
         hp = random_hyperparameters()
@@ -160,13 +177,13 @@ def train_lstm_model(hostname):
         dropout = hp['dropout']
         learning_rate = hp['learning_rate']
 
-        print(f'[TRAINING START] {hostname}: n_steps={n_steps}, units={lstm_units}, epochs={epochs}, batch={batch_size}, dropout={dropout}, lr={learning_rate}')
+        print(f'[TRAINING START] {hostname}: n_steps={n_steps}, steps_ahead={steps_ahead}, units={lstm_units}, epochs={epochs}, batch={batch_size}, dropout={dropout}, lr={learning_rate}')
 
         # Get data workload
         df = workload.get(hostname)
 
-        # Split into samples
-        X, y, df_arr = concatenate_samples(df, n_steps)
+        # Use steps_ahead for training target
+        X, y, df_arr = concatenate_samples(df, n_steps, steps_ahead)
         # reshape from [samples, timesteps] into [samples, timesteps, features]
         n_features = 1
         X = X.reshape((X.shape[0], X.shape[1], n_features))
@@ -203,10 +220,11 @@ def train_lstm_model(hostname):
         time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
 
         model.load_weights(filepath)
-        filename = f'{val_loss}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}.keras'
+        # Include steps_ahead in filename
+        filename = f'{val_loss}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}_{steps_ahead}ahead.keras'
         model.save(f'models/{hostname}/{filename}')
 
-        print(f'[MODEL SAVED] {hostname}: {filename} (val_loss: {val_loss})')
+        print(f'[MODEL SAVED] {hostname}: {filename} (val_loss: {val_loss}, steps_ahead: {steps_ahead})')
 
         return model
     except Exception as e:
@@ -220,12 +238,12 @@ def select_best_model(hostname):
     if not models:
         return None
 
-    # Parse validation loss from filenames (format: {val_loss}_{timestamp}_{epochs}_{n_steps}_{units}.keras)
+    # Parse validation loss from filenames (format: {val_loss}_{timestamp}_{epochs}_{n_steps}_{units}_{steps_ahead}ahead.keras)
     model_losses = []
     for model_file in models:
         try:
-            # Try new format first
-            parts = model_file.split('_')
+            # Try new format with steps_ahead
+            parts = model_file.replace('.keras', '').split('_')
             if len(parts) >= 4:
                 loss = float(parts[0])
             else:
@@ -368,7 +386,7 @@ class LSTMTrainingManager:
                 last_df = split_dataframes(df)[-1]
 
                 if len(last_df) > 50 and len(df) > 100:
-                    model = train_lstm_model(hostname)
+                    model = train_lstm_model(hostname, steps_ahead=6)
 
                     if model:
                         # Validate prediction quality
@@ -417,10 +435,17 @@ class LSTMTrainingManager:
                 sleep(30)
 
 
-def lstm(hostname):
+def lstm(hostname, steps_ahead=6):
     """
     Non-blocking LSTM prediction using best available model.
     Never blocks on training operations - uses cached model or falls back gracefully.
+
+    Args:
+        hostname: Hostname to predict RAM for
+        steps_ahead: Number of steps ahead to predict (default: 6 for 3 minutes)
+
+    Returns:
+        Predicted RAM value or current RAM as fallback
     """
     # Check if a trained model is available
     best_model, model_file = lstm_manager.get_best_model_with_filename(hostname)
@@ -439,7 +464,7 @@ def lstm(hostname):
                 loss = 0
                 model_file = "unknown"
 
-            print(f'[PREDICTION START] {hostname}: Using model {model_file} (loss: {loss:.6f})')
+            print(f'[PREDICTION START] {hostname}: Using model {model_file} (loss: {loss:.6f}, steps_ahead: {steps_ahead})')
 
             # Prepare input data (need at least n_steps samples)
             if len(df) >= n_steps:
@@ -447,22 +472,21 @@ def lstm(hostname):
                 x_input = array(df[-n_steps:].mem.values)
                 x_input = x_input.reshape((1, n_steps, n_features))
 
+                # Make prediction (direct, not iterative)
                 predict = best_model.predict(x_input, verbose=0)[0][0]
 
-                # Check if prediction is coherent with last historical value
+                # Validation: Check if prediction is coherent with last value
                 if len(df) > 0:
                     last_value = df.iloc[-1]['mem']
-                    abs_diff = abs(predict - last_value)
+                    diff = abs(predict - last_value)
 
-                    # Check if difference is > 15 units OR > 20% of last value
-                    if last_value > 0:  # Avoid division by zero
-                        pct_diff = (abs_diff / last_value) * 100
-                        if abs_diff > 15 or pct_diff > 20:
-                            actual_ram = ram_usage.get(hostname)
-                            print(f'[PREDICTION DISCREPANT] {hostname}: LSTM={predict:.2f}, Last={last_value:.2f}, Diff={abs_diff:.2f} ({pct_diff:.1f}%), Using RAM: {actual_ram:.2f}')
-                            return actual_ram
+                    if diff > 20 and diff > abs(predict) * 0.20:
+                        # Prediction too different from last value, use current RAM
+                        actual_ram = ram_usage.get(hostname)
+                        print(f'[PREDICTION INCOHERENT] {hostname}: LSTM={predict:.2f}, Last={last_value:.2f}, Diff={diff:.2f}, Using RAM: {actual_ram:.2f}')
+                        return actual_ram
 
-                print(f'LSTM prediction for {hostname}: {predict:.2f} (model: {model_file})')
+                print(f'LSTM prediction for {hostname}: {predict:.2f} (model: {model_file}, steps_ahead: {steps_ahead})')
                 return predict
             else:
                 print(f'Insufficient data for LSTM prediction on {hostname}: {len(df)} samples, using current RAM')

@@ -18,6 +18,7 @@ valid_params = [
 	'-on', '--on',
 	'-off', '--off',
 	'-s', '--status',
+		'-o', '--orchestrator',
 ]
 
 help_msg = '''
@@ -36,7 +37,8 @@ Options and Parameters:
 	-i,   --instantiator [QT]           	starts a [QT] number of instances one by one, every 30 seconds, and then shut down one by one, continuously
 	-on,  --on [QT]                     	starts a quantity [QT] of instances
 	-off, --off [QT]                    	shut offs quantity [QT] of instances
-	-s,   --status                      	shows information about Compute hosts
+	-s,   --status
+		'-o', '--orchestrator',                      	shows information about Compute hosts
 		'''
 
 if arg1 not in valid_params:
@@ -92,5 +94,9 @@ else:
 			except:
 				pass
 			sleep(10)
+	if arg1 == '--orchestrator' or arg1 == '-o':
+		# Import orchestrator
+		import orchestrator
+		orchestrator.main()
 	# except:
 	# 	print("Something is wrong with the OpenStack environment or this computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
