@@ -17,18 +17,22 @@ import status
 import changestate
 import instances
 import verifier
+import registrator
 
 
 class ExperimentOrchestrator:
 	"""Gerencia experimento completo do CES."""
 
 	def __init__(self, lim_max=70, lim_med=30, predict_model='default',
-				 num_vms=27, experiment_duration_hours=18):
+				 num_vms=27, experiment_duration_hours=18, wake_only=False, verify_only=False, instantiator_only=False):
 		self.lim_max = lim_max
 		self.lim_med = lim_med
 		self.predict_model = predict_model
 		self.num_vms = num_vms
 		self.experiment_duration = experiment_duration_hours * 3600
+		self.wake_only = wake_only
+		self.verify_only = verify_only
+		self.instantiator_only = instantiator_only
 		self.cancelled = False
 		self.verification_active = False
 		self.results = {
@@ -50,18 +54,26 @@ class ExperimentOrchestrator:
 		print(f'\r[{bar}] {percent:.1f}% - {message}', end='', flush=True)
 
 	def wake_all_hosts(self):
-		"""Wake all registered hosts."""
+		"""Wake controller and all registered hosts."""
 		print('\n[1/6] Acordando hosts...')
+
+		# Acordar controller primeiro
+		print('\n   Acordando controller...')
+		changestate.wake('controller')
+		self.results['hosts_waked'].append('controller')
+		time.sleep(5)
+
+		# Depois acorda computes registrados
 		try:
 			with open("registered.txt", "r") as f:
 				hosts = f.read().strip()
 		except:
 			print('   ! Arquivo registered.txt não encontrado')
-			return []
+			# Continuar mesmo sem computes
 
 		# Parse the registered list
 		try:
-			registered = ast.literal_eval(hosts)
+			registered = ast.literal_eval(hosts) if hosts else []
 		except:
 			# Try simple comma-separated format
 			registered = [h.strip() for h in hosts.split(',') if h.strip()]
@@ -72,12 +84,12 @@ class ExperimentOrchestrator:
 			print(f'\n   Acordando {hostname}...')
 			changestate.wake(hostname)
 			self.results['hosts_waked'].append(hostname)
-			time.sleep(5)  # Wait between wakes
+			time.sleep(3)  # Wait between wakes
 
 		return self.results['hosts_waked']
 
 	def wait_hosts_ready(self, timeout=300):
-		"""Wait for all hosts to reach UP state."""
+		"""Wait for controller and all computes to reach UP state."""
 		print('\n[2/6] Aguardando hosts ficarem prontos...')
 		start = time.time()
 
@@ -86,45 +98,120 @@ class ExperimentOrchestrator:
 				break
 
 			all_up = True
-			hosts_status = status.get()
-			for hostname in self.results['hosts_waked']:
-				found = False
-				for host in hosts_status:
-					if host['hostname'] == hostname and host['state'] == 'up':
-						found = True
-						break
-				if not found:
-					all_up = False
-					break
+			computes_up = 0
 
-			if all_up and self.results['hosts_waked']:
-				print('\n   ✓ Todos hosts prontos!')
+			try:
+				# Verificar via OpenStack se os computes estão UP
+				import requests, header
+				r = requests.get('http://controller:8774/v2.1/os-hypervisors',
+							   headers=header.get(), timeout=5)
+				hypervisors = __import__('json', fromlist=['loads']).loads(r.content)['hypervisors']
+
+				for hv in hypervisors:
+					hostname = hv['hypervisor_hostname']
+					if hostname in self.results['hosts_waked'] or 'compute' in hostname.lower():
+						if hv['state'] == 'up':
+							computes_up += 1
+						else:
+							all_up = False
+
+				# Verificar se temos pelo menos 3 computes UP
+				if computes_up >= 3:
+					all_up = True
+
+			except Exception as e:
+				# OpenStack ainda não está pronto, continuar aguardando
+				all_up = False
+
+			if all_up:
+				print(f'\n   ✓ Todos hosts prontos! ({computes_up}/3 computes UP)')
 				return True
 
 			# Show countdown
 			remaining = int(timeout - (time.time() - start))
-			print(f'\r   Aguardando... {remaining//60}m {remaining%60}s   ', end='', flush=True)
-			time.sleep(10)
+			print(f'\r   Aguardando... {remaining//60}m {remaining%60}s ({computes_up}/3 UP)  ', end='', flush=True)
+			time.sleep(5)
 
 		print('\n   ✗ Timeout aguardando hosts')
 		return False
 
 	def register_hosts(self):
-		"""Ensure hosts are registered."""
+		"""Ensure hosts are registered - executes registrator if needed."""
 		print('\n[3/6] Verificando registro de hosts...')
 		try:
 			with open("registered.txt", "r") as f:
-				registered = f.read()
+				registered = f.read().strip()
+				if registered and registered not in ['[]', '']:
+					print(f'   ✓ Hosts já registrados: {registered}')
+					return ast.literal_eval(registered)
+		except:
+			pass
+
+		# Se não há hosts registrados ou arquivo está vazio, executar registrator
+		print('   ! Nenhum host registrado, executando registrator...')
+		registrator.run()
+
+		# Verificar novamente após registrator
+		try:
+			with open("registered.txt", "r") as f:
+				registered = f.read().strip()
 				print(f'   ✓ Hosts registrados: {registered}')
 				return ast.literal_eval(registered)
 		except:
-			print('   ! Arquivo registered.txt não encontrado, execute --registrator primeiro')
+			print('   ! Erro ao registrar hosts')
 			return []
+
+	def run_verification_only(self):
+		"""Run verifier in continuous mode without instantiator."""
+		print('\n[VERIFY-ONLY] Iniciando verificação contínua...')
+		print(f'   Limite MAX: {self.lim_max}%')
+		print(f'   Limite MED: {self.lim_med}%')
+		print(f'   Modelo: {self.predict_model}')
+		print('   Pressione Ctrl+C para parar\n')
+
+		try:
+			verifier.start(self.lim_max, self.lim_med, self.predict_model, continuous=True)
+		except KeyboardInterrupt:
+			print('\n\n! Verificação interrompida')
+			self.cancelled = True
+
+	def run_instantiator_only(self):
+		"""Run instantiator only - create/delete VMs in loop."""
+		print('\n[INSTANTIATOR-ONLY] Criando e deletando VMs em loop...')
+		print(f'   Número de VMs por ciclo: {self.num_vms}')
+		print('   Pressione Ctrl+C para parar\n')
+
+		try:
+			self.start_instantiator()
+		except KeyboardInterrupt:
+			print('\n\n! Instantiator interrompido')
+			self.cancelled = True
+		finally:
+			self.save_final_status()
 
 	def start_verification(self):
 		"""Start verification loop in background thread."""
 		print('\n[4/6] Iniciando verificação em background...')
 		import threading
+		import event_logger
+		from datetime import datetime
+
+		# Initialize event logger with model-specific filename
+		event_file = f'events_{self.predict_model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+		event_logger.logger = event_logger.EventLogger(event_file)
+		print(f'   Event logging: {event_file}')
+
+		# Start workload collection for registered hosts
+		try:
+			with open("registered.txt", "r") as file:
+				import ast
+				registered = ast.literal_eval(file.read())
+			print(f'   Iniciando workload collection para {len(registered)} hosts...')
+			for hostname in registered:
+				import workload
+				threading.Thread(target=workload.save, args=[hostname], daemon=True).start()
+		except:
+			print('   ! Nenhum host registrado para workload collection')
 
 		def verification_loop():
 			self.verification_active = True
@@ -281,12 +368,29 @@ class ExperimentOrchestrator:
 		"""Execute complete experiment."""
 		self.results['start_time'] = datetime.now().isoformat()
 
+		# Instantiator-only mode: Skip wake, register, verification
+		if self.instantiator_only:
+			print('\n=== Modo Instantiator-Only: Executa apenas criação/deleção de VMs ===')
+			self.run_instantiator_only()
+			return
+
+		# Verify-only mode: Skip wake, register, instantiator
+		if self.verify_only:
+			print('\n=== Modo Verify-Only: Executa apenas verificação ===')
+			self.run_verification_only()
+			return
+
 		try:
 			self.wake_all_hosts()
 			if not self.cancelled:
 				self.wait_hosts_ready()
 			if not self.cancelled:
 				self.register_hosts()
+
+			if self.wake_only:
+				print('\n=== Modo Wake-Only: encerrando após wake e registro ===')
+				return
+
 			if not self.cancelled:
 				self.start_verification()
 			if not self.cancelled:
@@ -298,7 +402,8 @@ class ExperimentOrchestrator:
 			import traceback
 			traceback.print_exc()
 		finally:
-			self.save_final_status()
+			if not self.wake_only and not self.verify_only and not self.instantiator_only:
+				self.save_final_status()
 
 
 def main():
@@ -309,6 +414,9 @@ def main():
 	parser.add_argument('--num-vms', type=int, default=27, help='Número de VMs para instanciar')
 	parser.add_argument('--duration', type=int, default=18, help='Duração do experimento (horas)')
 	parser.add_argument('--config', help='Arquivo de configuração JSON')
+	parser.add_argument('--wake-only', action='store_true', help='Executar apenas wake dos hosts')
+	parser.add_argument('--verify-only', action='store_true', help='Executar apenas verificação contínua')
+	parser.add_argument('--instantiator-only', action='store_true', help='Executar apenas criação/deleção de VMs')
 
 	args = parser.parse_args()
 
@@ -317,7 +425,10 @@ def main():
 		lim_med=args.lim_med,
 		predict_model=args.model,
 		num_vms=args.num_vms,
-		experiment_duration_hours=args.duration
+		experiment_duration_hours=args.duration,
+		wake_only=args.wake_only,
+		verify_only=args.verify_only,
+		instantiator_only=args.instantiator_only
 	)
 
 	print('='*60)
@@ -329,6 +440,12 @@ def main():
 	print(f'  Modelo: {args.model}')
 	print(f'  VMs: {args.num_vms}')
 	print(f'  Duração: {args.duration}h')
+	if args.wake_only:
+		print(f'  Modo: WAKE-ONLY')
+	if args.verify_only:
+		print(f'  Modo: VERIFY-ONLY')
+	if args.instantiator_only:
+		print(f'  Modo: INSTANTIATOR-ONLY')
 	print('='*60)
 
 	orchestrator.run()

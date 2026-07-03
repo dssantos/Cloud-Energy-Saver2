@@ -19,6 +19,11 @@ load_dotenv()
 lstm_manager = None
 experiment_start_time = None
 
+# Emergency wake cooldown tracking
+# Format: {hostname: timestamp_of_wake}
+emergency_wake_cooldowns = {}
+EMERGENCY_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after emergency wake
+
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
     """
@@ -103,6 +108,18 @@ def wait_for_state_change(hostname, target_state, timeout=300, details_collector
 
     # Mark as failed but continue execution
     return False
+
+
+def is_in_cooldown(hostname):
+    """Check if host is in emergency wake cooldown period."""
+    if hostname not in emergency_wake_cooldowns:
+        return False
+    elapsed = time.time() - emergency_wake_cooldowns[hostname]
+    if elapsed > EMERGENCY_COOLDOWN_SECONDS:
+        # Cooldown expired, remove from tracking
+        del emergency_wake_cooldowns[hostname]
+        return False
+    return True
 
 
 def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
@@ -255,7 +272,26 @@ def run(lim_max, lim_med, predict_model):
 
 ## Logic of the management of the hosts to be turned on and off
 
-    if ram_avg > lim_max:						## If RAM is above the maximum limit
+    # EMERGENCY LOGIC: When all normal hosts are overloaded and there are offline hosts
+    if len(overloaded) > 0 and len(normal) == 0 and len(offline) > 0:
+        emergency_host = offline[0]
+        print(f'EMERGÊNCIA: Todos os hosts normais sobrecarregados! Acordando {emergency_host}...')
+        event_logger.logger.log(Event(
+            timestamp=datetime.now().isoformat(),
+            event_type='wake',
+            hostname=emergency_host,
+            trigger_type=f'{predict_model}_emergency',
+            ram_avg=ram_avg,
+            lim_max=lim_max,
+            lim_med=lim_med,
+            running_hosts=len(running),
+            idle_hosts=len(idle),
+            offline_hosts=len(offline)
+        ))
+        # Set cooldown to prevent immediate shutdown
+        emergency_wake_cooldowns[emergency_host] = time.time()
+        changestate.wake(emergency_host)
+    elif ram_avg > lim_max:						## If RAM is above the maximum limit
         if len(idle) > 0:
             if len(idle) > 1:					## They keep 1 idle on and shut off others
                 for i in range(len(idle)-1):	# Turn off all except 1
@@ -321,12 +357,16 @@ def run(lim_max, lim_med, predict_model):
     else:
         if len(idle) > 0:
             if ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
-                for i in range(len(idle)-1):	# Turn off all except 1
-                    print('desligando %s' %idle[i+1])
+                # Filter out hosts in cooldown
+                idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
+                # Keep at least 1 host (either not in cooldown or the first one)
+                shutdown_candidates = idle_non_cooldown[:-1] if len(idle_non_cooldown) > 1 else []
+                for host in shutdown_candidates:	# Turn off all except 1
+                    print('desligando %s' % host)
                     event_logger.logger.log(Event(
                         timestamp=datetime.now().isoformat(),
                         event_type='shutdown',
-                        hostname=idle[i+1],
+                        hostname=host,
                         trigger_type=predict_model,
                         ram_avg=ram_avg,
                         lim_max=lim_max,
@@ -335,10 +375,18 @@ def run(lim_max, lim_med, predict_model):
                         idle_hosts=len(idle),
                         offline_hosts=len(offline)
                     ))
-                    changestate.shutdown(idle[i+1])
+                    changestate.shutdown(host)
             else:
                 if len(running) >= 1:		## If there is at least 1 active host
-                    for host in idle:
+                    # Filter out hosts in cooldown - never shut down emergency hosts
+                    idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
+                    cooldown_hosts = [h for h in idle if is_in_cooldown(h)]
+                    # Log cooldown protected hosts
+                    for host in cooldown_hosts:
+                        elapsed = time.time() - emergency_wake_cooldowns[host]
+                        remaining = EMERGENCY_COOLDOWN_SECONDS - elapsed
+                        print(f'[COOLDOWN] {host} protegido por {remaining:.0f}s (emergency wake)')
+                    for host in idle_non_cooldown:
                         print('desligando %s' %host)
                         event_logger.logger.log(Event(
                             timestamp=datetime.now().isoformat(),
@@ -354,12 +402,16 @@ def run(lim_max, lim_med, predict_model):
                         ))
                         changestate.shutdown(host)		# shut down all idle hosts
                 else:								# Else...
-                    for i in range(len(idle)-1):	# Turn off all except 1
-                        print('desligando %s' %idle[i+1])
+                    # Filter out hosts in cooldown
+                    idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
+                    # Keep at least 1 host (either not in cooldown or the first one)
+                    shutdown_candidates = idle_non_cooldown[:-1] if len(idle_non_cooldown) > 1 else []
+                    for host in shutdown_candidates:	# Turn off all except 1
+                        print('desligando %s' % host)
                         event_logger.logger.log(Event(
                             timestamp=datetime.now().isoformat(),
                             event_type='shutdown',
-                            hostname=idle[i+1],
+                            hostname=host,
                             trigger_type=predict_model,
                             ram_avg=ram_avg,
                             lim_max=lim_max,
@@ -368,7 +420,7 @@ def run(lim_max, lim_med, predict_model):
                             idle_hosts=len(idle),
                             offline_hosts=len(offline)
                         ))
-                        changestate.shutdown(idle[i+1])
+                        changestate.shutdown(host)
 
 def start(lim_max, lim_med, predict_model, continuous=False):
     global lstm_manager, experiment_start_time

@@ -5,6 +5,7 @@ import requests, header, subprocess, time, sys
 
 
 def get():
+	_refresh_vm_list()
 	vms = []
 	pos = length -1
 
@@ -72,14 +73,20 @@ def auto_on(limit):
 			command = "ssh user@controller '. admin-openrc && openstack server delete %s'" %vm
 			run = subprocess.check_output(command, shell=True)  # Receives the output of the above command
 
-try:
-	r = requests.get('http://controller:8774/v2.1/servers', headers=header.get())
-except requests.exceptions.ConnectionError as e:
-	raise requests.exceptions.ConnectionError(f"{e}: This computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
+# NOTE: A requisição HTTP foi movida para dentro da função get()
+# para evitar erro ao importar o módulo quando controller não está disponível
+length = 0
 
-vm_list = json.loads(r.content) # Returns the content of the queried URL
-vm_list = vm_list['servers']
-length = len(vm_list)
+def _refresh_vm_list():
+	"""Refresh the VM list from OpenStack."""
+	global length, vm_list
+	try:
+		r = requests.get('http://controller:8774/v2.1/servers', headers=header.get())
+	except requests.exceptions.ConnectionError as e:
+		raise requests.exceptions.ConnectionError(f"{e}: This computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
+
+	vm_list = json.loads(r.content)['servers']
+	length = len(vm_list)
 
 
 # SLA Monitoring Constants and Functions
