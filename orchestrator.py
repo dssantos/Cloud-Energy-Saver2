@@ -213,6 +213,17 @@ class ExperimentOrchestrator:
 		except:
 			print('   ! Nenhum host registrado para workload collection')
 
+		# Initialize LSTM training for LSTM model
+		if self.predict_model == 'lstm':
+			try:
+				import predict
+				print(f'   Iniciando LSTM training para {len(registered)} hosts...')
+				for hostname in registered:
+					predict.lstm_manager.start_training(hostname)
+				print(f'   ✓ LSTM training iniciado')
+			except Exception as e:
+				print(f'   ! Erro ao iniciar LSTM training: {e}')
+
 		def verification_loop():
 			self.verification_active = True
 			while self.verification_active and not self.cancelled:

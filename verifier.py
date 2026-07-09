@@ -259,6 +259,12 @@ def run(lim_max, lim_med, predict_model):
             if host['hostname'] in registered:
                 offline.append(host['hostname']) # Inserts hosts that are shut down (and registered) in an list of offline
 
+    # Sort lists to prioritize higher-numbered computes for shutdown
+    # idle: reverse order (compute3, compute2, compute1) - shutdown higher numbers first
+    idle.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0), reverse=True)
+    # offline: normal order (compute1, compute2, compute3) - wake lower numbers first
+    offline.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
+
     # Calculate RAM average excluding overloaded hosts
     hosts_for_avg = status.get()
     ram_avg, overloaded, normal = calculate_ram_average(hosts_for_avg, lim_max, predict_model)

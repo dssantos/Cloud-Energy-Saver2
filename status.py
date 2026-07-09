@@ -7,6 +7,12 @@ def get():
 
     r = requests.get('http://controller:8774/v2.1/os-hypervisors', headers=header.get())
     hosts = json.loads(r.content) # Returns the content of the queried URL
+
+    # Check if 'hypervisors' key exists
+    if 'hypervisors' not in hosts:
+        print('[ERROR] API response missing hypervisors key')
+        return []
+
     hosts = hosts['hypervisors']
     ## Tests
     # hosts = [{'status': 'enabled', 'state': 'down', 'id': 1, 'hypervisor_hostname': 'compute1'},{'status': 'enabled', 'state': 'down', 'id': 1, 'hypervisor_hostname': 'compute2'},{'status': 'enabled', 'state': 'down', 'id': 1, 'hypervisor_hostname': 'compute3'},{'status': 'enabled', 'state': 'up', 'id': 1, 'hypervisor_hostname': 'compute6'},{'status': 'enabled', 'state': 'up', 'id': 1, 'hypervisor_hostname': 'compute5'}]

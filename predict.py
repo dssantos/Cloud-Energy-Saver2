@@ -1,5 +1,6 @@
 import os
 import io
+import json
 import logging
 import warnings
 from contextlib import redirect_stderr
@@ -167,7 +168,10 @@ def update_model_loss(hostname, model_file, actual_loss):
 
 def train_lstm_model(hostname, steps_ahead=6):
     """Train LSTM model with configurable prediction horizon."""
+    import os  # Import at function level to avoid UnboundLocalError
     try:
+        print(f'[TRAINING] {hostname}: Iniciando processo de treinamento...')
+
         # Get random hyperparameters
         hp = random_hyperparameters()
         n_steps = hp['n_steps']
@@ -181,9 +185,14 @@ def train_lstm_model(hostname, steps_ahead=6):
 
         # Get data workload
         df = workload.get(hostname)
+        print(f'[TRAINING] {hostname}: Dados obtidos - {len(df)} registros')
+        dfs = split_dataframes(df)
+        print(f'[TRAINING] {hostname}: Dataframes criados - {len(dfs)} dataframes')
 
         # Use steps_ahead for training target
         X, y, df_arr = concatenate_samples(df, n_steps, steps_ahead)
+        print(f'[TRAINING] {hostname}: Dados preparados - X shape: {X.shape}, y shape: {y.shape}')
+
         # reshape from [samples, timesteps] into [samples, timesteps, features]
         n_features = 1
         X = X.reshape((X.shape[0], X.shape[1], n_features))
@@ -192,6 +201,7 @@ def train_lstm_model(hostname, steps_ahead=6):
         split_index = len(X) * 8 // 10
         Xtrain, Xval = X[:split_index], X[split_index:]
         ytrain, yval = y[:split_index], y[split_index:]
+        print(f'[TRAINING] {hostname}: Split - Train: {Xtrain.shape}, Val: {Xval.shape}')
 
         # Define model with dropout
         model = Sequential()
@@ -202,6 +212,7 @@ def train_lstm_model(hostname, steps_ahead=6):
         # Custom optimizer with learning rate
         opt = keras.optimizers.Adam(learning_rate=learning_rate)
         model.compile(optimizer=opt, loss='mse')
+        print(f'[TRAINING] {hostname}: Modelo criado e compilado')
 
         # Model checkpoint
         filepath = f'models/{hostname}/weights-{epochs:02d}.h5'
@@ -210,23 +221,65 @@ def train_lstm_model(hostname, steps_ahead=6):
         callbacks_list = [checkpoint]
 
         # Fit model with validation split
+        print(f'[TRAINING] {hostname}: Iniciando fit ({epochs} epochs)...')
         history = model.fit(Xtrain, ytrain, epochs=epochs, batch_size=batch_size,
                            verbose=0, validation_data=(Xval, yval), callbacks=callbacks_list)
+        print(f'[TRAINING] {hostname}: Fit completado - val_loss final: {history.history["val_loss"][-1]:.6f}')
 
         # Save model named as validation loss value
         val_loss = history.history['val_loss'][-1]
-        val_loss = '.'.join([str(val_loss).split('.')[0].zfill(3),
+        val_loss_str = '.'.join([str(val_loss).split('.')[0].zfill(3),
                             str(val_loss).split('.')[-1][:6]])  # Keep 6 decimal places
         time_stamp = datetime.strftime(datetime.now(), '%Y%m%d%H%M%S')
+        print(f'[TRAINING] {hostname}: Calculando val_loss - {val_loss:.6f}')
 
-        model.load_weights(filepath)
+        # Load best weights if checkpoint file exists
+        if os.path.exists(filepath):
+            print(f'[TRAINING] {hostname}: Carregando pesos do checkpoint {filepath}...')
+            model.load_weights(filepath)
+            print(f'[TRAINING] {hostname}: Pesos carregados com sucesso')
+        else:
+            # Use current weights if checkpoint was cleaned up
+            print(f'[WARNING] {hostname}: Checkpoint file {filepath} not found, using current weights')
+
         # Include steps_ahead in filename
-        filename = f'{val_loss}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}_{steps_ahead}ahead.keras'
-        model.save(f'models/{hostname}/{filename}')
+        filename = f'{val_loss_str}_{time_stamp}_{epochs}_{n_steps}_{lstm_units}_{steps_ahead}ahead.keras'
+        model_path = f'models/{hostname}/{filename}'
 
-        print(f'[MODEL SAVED] {hostname}: {filename} (val_loss: {val_loss}, steps_ahead: {steps_ahead})')
+        print(f'[TRAINING] {hostname}: Salvando modelo em {filename}...')
+        model.save(model_path)
+        print(f'[TRAINING] {hostname}: model.save() chamado')
 
-        return model
+        # Verify file was actually saved
+        if os.path.exists(model_path):
+            file_size = os.path.getsize(model_path)
+            print(f'[MODEL SAVED] {hostname}: {filename} (val_loss: {val_loss_str}, steps_ahead: {steps_ahead}, size: {file_size} bytes)')
+
+            # Clean up intermediate weight files AFTER model is successfully saved
+            # This prevents race condition where select_best_model() deletes .h5 during training
+            try:
+                for f in os.listdir(f'models/{hostname}'):
+                    if f.startswith('weights-'):
+                        try:
+                            os.remove(f'models/{hostname}/{f}')
+                            print(f'[CLEANUP] {hostname}: Removed checkpoint {f}')
+                        except OSError:
+                            pass
+            except Exception as e:
+                print(f'[CLEANUP WARNING] {hostname}: Could not clean up weight files: {e}')
+
+            print(f'[TRAINING COMPLETE] {hostname}: Modelo treinado e salvo com sucesso')
+            return model
+        else:
+            print(f'[MODEL SAVE ERROR] {hostname}: File not created: {filename}')
+            print(f'[ERROR] {hostname}: model_path={model_path}, os.path.exists={os.path.exists(model_path)}')
+            return None
+
+    except Exception as e:
+        print(f'[TRAINING ERROR] {hostname}: Exception during training: {e}')
+        import traceback
+        traceback.print_exc()
+        return None
     except Exception as e:
         print(f'[TRAINING ERROR] {hostname}: Unable to train now: {e}')
 
@@ -256,24 +309,35 @@ def select_best_model(hostname):
     if not model_losses:
         return None
 
-    # Sort by validation loss and return best
-    model_losses.sort(key=lambda x: x[0])
-    best_model = model_losses[0][1]
+    # Load incoherence counts
+    incoherence_counts = load_incoherence_counts(hostname)
 
-    # Keep only 5 best models, delete rest
-    for loss, worst_file in model_losses[5:]:
+    # Calculate effective score (loss + incoherence penalty)
+    model_scores = []
+    for loss, model_file in model_losses:
+        incoherence_count = incoherence_counts.get(model_file, 0)
+        effective_score = loss + (incoherence_count * PENALTY_FACTOR)
+        model_scores.append((effective_score, loss, model_file))
+        print(f'[MODEL SCORE] {model_file}: loss={loss:.6f}, incoherences={incoherence_count}, score={effective_score:.6f}')
+
+    # Sort by effective score and return best
+    model_scores.sort(key=lambda x: x[0])
+    best_model = model_scores[0][2]  # Return filename with best score
+
+    # Keep only 20 best models, delete rest
+    for loss, worst_file in model_losses[20:]:
         try:
             os.remove(f'{model_dir}/{worst_file}')
+            # Clean up incoherence count for deleted model
+            counts = load_incoherence_counts(hostname)
+            if worst_file in counts:
+                del counts[worst_file]
+                save_incoherence_counts(hostname, counts)
         except OSError:
             pass
 
-    # Clean up intermediate weight files
-    for f in os.listdir(model_dir):
-        if f.startswith('weights-'):
-            try:
-                os.remove(f'{model_dir}/{f}')
-            except OSError:
-                pass
+    # NOTE: Weight files cleanup moved to train_lstm_model() to avoid race condition
+    # with ongoing training. Only clean up .h5 files after model is successfully saved.
 
     return best_model
 
@@ -293,10 +357,12 @@ class LSTMTrainingManager:
     def start_training(self, hostname):
         """Start continuous training thread for a host."""
         if hostname in self.training_threads and self.training_threads[hostname].is_alive():
+            print(f'[TRAINING MANAGER] {hostname}: Já está em treinamento')
             return  # Already training
 
         os.makedirs(f'models/{hostname}', exist_ok=True)
 
+        print(f'[TRAINING MANAGER] {hostname}: Iniciando thread de treinamento')
         thread = threading.Thread(
             target=self._training_loop,
             args=[hostname],
@@ -304,6 +370,7 @@ class LSTMTrainingManager:
         )
         thread.start()
         self.training_threads[hostname] = thread
+        print(f'[TRAINING MANAGER] {hostname}: Thread de treinamento iniciada (PID: {thread.ident})')
 
     def get_best_model(self, hostname):
         """Get best trained model without blocking."""
@@ -380,12 +447,14 @@ class LSTMTrainingManager:
 
     def _training_loop(self, hostname):
         """Continuous training loop running in background."""
+        print(f'[TRAINING LOOP] {hostname}: Loop iniciado')
         while not self.stop_event.is_set():
             try:
                 df = workload.get(hostname)
                 last_df = split_dataframes(df)[-1]
 
                 if len(last_df) > 50 and len(df) > 100:
+                    print(f'[TRAINING LOOP] {hostname}: Condições atendidas - last_df: {len(last_df)}, df: {len(df)}')
                     model = train_lstm_model(hostname, steps_ahead=6)
 
                     if model:
@@ -431,7 +500,9 @@ class LSTMTrainingManager:
                 sleep(30)  # Rate limit: max 2 trains/minute/host
 
             except Exception as e:
-                print(f'[TRAINING ERROR] {hostname}: {e}')
+                print(f'[TRAINING LOOP ERROR] {hostname}: {e}')
+                import traceback
+                traceback.print_exc()
                 sleep(30)
 
 
@@ -484,6 +555,10 @@ def lstm(hostname, steps_ahead=6):
                         # Prediction too different from last value, use current RAM
                         actual_ram = ram_usage.get(hostname)
                         print(f'[PREDICTION INCOHERENT] {hostname}: LSTM={predict:.2f}, Last={last_value:.2f}, Diff={diff:.2f}, Using RAM: {actual_ram:.2f}')
+
+                        # Track this incoherence for the model
+                        increment_incoherence(hostname, model_file)
+
                         return actual_ram
 
                 print(f'LSTM prediction for {hostname}: {predict:.2f} (model: {model_file}, steps_ahead: {steps_ahead})')
@@ -499,6 +574,48 @@ def lstm(hostname, steps_ahead=6):
         print(f'No trained model available for {hostname}, using current RAM')
         return ram_usage.get(hostname)
 
+# ============================================================================
+# Incoherence Tracking System
+# ============================================================================
+
+INCOHERENCE_FILE = './models/{hostname}/.incoherence_count.json'
+PENALTY_FACTOR = 0.5  # Each incoherence adds 0.5 to effective loss (gradual penalty)
+
+
+def load_incoherence_counts(hostname):
+    """Load incoherence counts from disk."""
+    incoherence_file = INCOHERENCE_FILE.format(hostname=hostname)
+    try:
+        if os.path.exists(incoherence_file):
+            with open(incoherence_file, 'r') as f:
+                return json.load(f)
+    except (IOError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def save_incoherence_counts(hostname, counts):
+    """Save incoherence counts to disk."""
+    incoherence_file = INCOHERENCE_FILE.format(hostname=hostname)
+    try:
+        os.makedirs(os.path.dirname(incoherence_file), exist_ok=True)
+        with open(incoherence_file, 'w') as f:
+            json.dump(counts, f)
+    except IOError:
+        pass
+
+
+def increment_incoherence(hostname, model_file):
+    """Increment incoherence count for a specific model."""
+    counts = load_incoherence_counts(hostname)
+    counts[model_file] = counts.get(model_file, 0) + 1
+    save_incoherence_counts(hostname, counts)
+    print(f'[INCOHERENCE TRACKING] {hostname}: {model_file} now has {counts[model_file]} incoherences')
+
+
+# ============================================================================
+# Global instances
+# ============================================================================
 
 # Global training manager instance
 lstm_manager = LSTMTrainingManager()
