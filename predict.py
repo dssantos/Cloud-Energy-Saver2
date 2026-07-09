@@ -453,8 +453,10 @@ class LSTMTrainingManager:
                 df = workload.get(hostname)
                 last_df = split_dataframes(df)[-1]
 
-                if len(last_df) > 50 and len(df) > 100:
-                    print(f'[TRAINING LOOP] {hostname}: Condições atendidas - last_df: {len(last_df)}, df: {len(df)}')
+                # Train if we have enough total data (removed last_df requirement)
+                # This allows training even when data has gaps that create smaller segments
+                if len(df) > 100:
+                    print(f'[TRAINING LOOP] {hostname}: Condições atendidas - df: {len(df)} (last_df: {len(last_df)})')
                     model = train_lstm_model(hostname, steps_ahead=6)
 
                     if model:
@@ -551,7 +553,7 @@ def lstm(hostname, steps_ahead=6):
                     last_value = df.iloc[-1]['mem']
                     diff = abs(predict - last_value)
 
-                    if diff > 20 and diff > abs(predict) * 0.20:
+                    if diff > 15 and diff > abs(predict) * 0.15:
                         # Prediction too different from last value, use current RAM
                         actual_ram = ram_usage.get(hostname)
                         print(f'[PREDICTION INCOHERENT] {hostname}: LSTM={predict:.2f}, Last={last_value:.2f}, Diff={diff:.2f}, Using RAM: {actual_ram:.2f}')
