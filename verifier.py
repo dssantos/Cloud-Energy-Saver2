@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 import workload, predict
 import event_logger
+import config
 from event_logger import Event
 
 # Load environment variables for email alerts
@@ -23,6 +24,10 @@ experiment_start_time = None
 # Format: {hostname: timestamp_of_wake}
 emergency_wake_cooldowns = {}
 EMERGENCY_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after emergency wake
+
+# SLA violation transition tracking (edge detection across run() cycles).
+# Logs only on False->True transition, avoiding one event per cycle.
+last_sla_violated = False
 
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
@@ -122,43 +127,95 @@ def is_in_cooldown(hostname):
     return True
 
 
+def classify_hosts(hosts, registered):
+    """
+    Classify hosts into running / idle / offline lists (sorted).
+      - running: up AND has VMs
+      - idle:    up AND no VMs
+      - offline: down AND registered
+    Reused by run() and by the cluster_workload logger (single source of truth).
+    """
+    running = []
+    idle = []
+    offline = []
+    for host in hosts:
+        if host['state'] == 'up':
+            if host['vms'] > 0:
+                running.append(host['hostname'])
+            else:
+                idle.append(host['hostname'])
+        else:
+            if host['hostname'] in registered:
+                offline.append(host['hostname'])
+    # idle: reverse order (compute3, compute2, ...) - shutdown higher numbers first
+    idle.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0), reverse=True)
+    # offline: normal order (compute1, compute2, ...) - wake lower numbers first
+    offline.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
+    return running, idle, offline
+
+
 def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
     """
-    Calculate RAM average excluding overloaded hosts (RAM > lim_max).
-    Returns: (avg_ram, overloaded_list, normal_list)
+    Compute RAM averages for decision AND analysis.
+
+    Returns: (avg_ram, overloaded, normal, avg_predicted, avg_actual)
+      - avg_ram:      mean of NORMAL hosts' ram_val (decision metric; prediction-based
+                      in lstm/naive/arima, live otherwise). Used for the shutdown lim_med
+                      comparison. Unchanged from original behavior.
+      - overloaded:   hostnames with ACTUAL ram > lim_max (installed overload).
+      - normal:       hostnames with ACTUAL ram <= lim_max.
+      - avg_predicted: mean of LSTM predictions of ALL up hosts (None when predict_model != 'lstm').
+      - avg_actual:   mean of LIVE RAM of ALL up hosts (real cluster load, for analysis/CSV).
+
+    Note: overloaded/normal classify by ACTUAL ram (not the prediction) so that the
+    emergency branch means *installed* overload (per plan). Otherwise, in lstm mode,
+    high predictions would set normal==0 and shadow the lstm_predictive wake branch.
+    ram_val (the prediction) is still used for avg_ram (the decision metric).
     """
     ram_values = []
     overloaded = []
     normal = []
+    actual_values = []
+    predicted_values = []
 
     for host in hosts_data:
         if host['state'] == 'up':
-            ram_val = host['ram']
+            actual = host['ram']
+            actual_values.append(actual)  # live reading (real load)
+            ram_val = actual
             if predict_model == 'lstm':
-                ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=6)
+                ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
+                predicted_values.append(ram_val)  # reuse the same prediction call
             elif predict_model == 'naive':
                 ram_val = predict.naive(host['hostname'])
             elif predict_model == 'arima':
                 ram_val = predict.arima(host['hostname'])
 
-            if ram_val > lim_max:
+            # Classify by ACTUAL ram -> emergency = installed overload (not predicted).
+            if actual > lim_max:
                 overloaded.append(host['hostname'])
             else:
                 normal.append(host['hostname'])
-                ram_values.append(ram_val)
+                ram_values.append(ram_val)  # decision metric (prediction where applicable)
 
     avg_ram = sum(ram_values) / len(ram_values) if ram_values else 0
-    return avg_ram, overloaded, normal
+    avg_actual = sum(actual_values) / len(actual_values) if actual_values else 0.0
+    avg_predicted = sum(predicted_values) / len(predicted_values) if predicted_values else None
+    return avg_ram, overloaded, normal, avg_predicted, avg_actual
 
 
-def check_sla_violation(running_hosts, idle_hosts, offline_hosts, ram_avg, lim_max):
+def check_sla_violation(running_hosts, idle_hosts, avg_actual, lim_max):
     """
-    Check for SLA violation conditions.
-    Returns True if system cannot handle current load.
+    SLA violation: real cluster load is high and there is no idle buffer to absorb it.
+
+    Uses avg_actual (real load of all active hosts) instead of the decision avg_ram,
+    which collapses to 0 under overload. `offline` presence at violation time is
+    captured in the logged event to classify the episode as avoidable (offline>0)
+    vs capacity limit (offline==0).
     """
-    if ram_avg > lim_max and len(offline_hosts) == 0 and len(idle_hosts) == 0:
+    if avg_actual > lim_max and len(idle_hosts) == 0:
         return True
-    if len(running_hosts) == 0 and ram_avg > lim_max:
+    if len(running_hosts) == 0 and avg_actual > lim_max:
         return True
     return False
 
@@ -232,14 +289,9 @@ def log_final_state():
 
 
 def run(lim_max, lim_med, predict_model):
+    global last_sla_violated
 
     hosts = status.get()
-    running = []
-    idle = []
-    offline = []
-
-    # Store predictions for LSTM (to log with wake events)
-    predictions = {}  # hostname -> (predicted_ram, actual_ram)
 
     try:
         file = open("registered.txt", "r+")
@@ -249,36 +301,46 @@ def run(lim_max, lim_med, predict_model):
         print('É preciso registrar os hosts do ambiente')
         registered = []
 
-    for host in hosts:
-        if host['state'] == 'up':
-            if host['vms'] > 0:
-                running.append(host['hostname']) # Inserts the hosts that are connected (and have VMs) in an list of actives
-            else:
-                idle.append(host['hostname']) # Inserts hosts that are running (and do not have VMs) in a list of idlers
-        else:
-            if host['hostname'] in registered:
-                offline.append(host['hostname']) # Inserts hosts that are shut down (and registered) in an list of offline
+    running, idle, offline = classify_hosts(hosts, registered)
 
-    # Sort lists to prioritize higher-numbered computes for shutdown
-    # idle: reverse order (compute3, compute2, compute1) - shutdown higher numbers first
-    idle.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0), reverse=True)
-    # offline: normal order (compute1, compute2, compute3) - wake lower numbers first
-    offline.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
-
-    # Calculate RAM average excluding overloaded hosts
-    hosts_for_avg = status.get()
-    ram_avg, overloaded, normal = calculate_ram_average(hosts_for_avg, lim_max, predict_model)
+    # ram_avg: decision metric (normal hosts only)
+    # avg_actual: real load (all active hosts) -> logged to cluster CSV and events
+    # avg_predicted: LSTM predictions mean (None when predict_model != 'lstm')
+    ram_avg, overloaded, normal, avg_predicted, avg_actual = calculate_ram_average(hosts, lim_max, predict_model)
 
     print('ativos: ' + str(running))
     print('ociosos: ' + str(idle))
     print('offline: ' + str(offline))
     print(f'sobrecarregados: {overloaded}')
     print(f'normais: {normal}')
-    print('média de ram: %s' %ram_avg)
+    print('média de ram (decisão): %s' % ram_avg)
+    print(f'média real (avg_actual): {avg_actual:.1f}%')
+
+    # SLA violation: log only on False->True transition (not every cycle).
+    # offline_hosts captured at violation time -> avoidable (>0) vs capacity limit (==0).
+    current_sla = check_sla_violation(running, idle, avg_actual, lim_max)
+    if current_sla and not last_sla_violated:
+        kind = 'EVITÁVEL (hosts offline disponíveis)' if len(offline) > 0 else 'LIMITE DE CAPACIDADE'
+        print(f'SLA VIOLAÇÃO [{kind}]: carga real {avg_actual:.1f}% > {lim_max}% sem idle ocioso.')
+        event_logger.logger.log(Event(
+            timestamp=datetime.now().isoformat(),
+            event_type='sla_violation',
+            hostname=None,
+            trigger_type=predict_model,
+            ram_avg=avg_actual,
+            lim_max=lim_max,
+            lim_med=lim_med,
+            running_hosts=len(running),
+            idle_hosts=len(idle),
+            offline_hosts=len(offline),
+            predicted_ram=avg_predicted,
+            actual_ram=avg_actual
+        ))
+    last_sla_violated = current_sla
 
 ## Logic of the management of the hosts to be turned on and off
 
-    # EMERGENCY LOGIC: When all normal hosts are overloaded and there are offline hosts
+    # EMERGENCY: all normal hosts overloaded and offline hosts available
     if len(overloaded) > 0 and len(normal) == 0 and len(offline) > 0:
         emergency_host = offline[0]
         print(f'EMERGÊNCIA: Todos os hosts normais sobrecarregados! Acordando {emergency_host}...')
@@ -287,79 +349,67 @@ def run(lim_max, lim_med, predict_model):
             event_type='wake',
             hostname=emergency_host,
             trigger_type=f'{predict_model}_emergency',
-            ram_avg=ram_avg,
+            ram_avg=avg_actual,
             lim_max=lim_max,
             lim_med=lim_med,
             running_hosts=len(running),
             idle_hosts=len(idle),
-            offline_hosts=len(offline)
+            offline_hosts=len(offline),
+            predicted_ram=avg_predicted,
+            actual_ram=avg_actual
         ))
         # Set cooldown to prevent immediate shutdown
         emergency_wake_cooldowns[emergency_host] = time.time()
         changestate.wake(emergency_host)
-    elif ram_avg > lim_max:						## If RAM is above the maximum limit
-        if len(idle) > 0:
-            if len(idle) > 1:					## They keep 1 idle on and shut off others
-                for i in range(len(idle)-1):	# Turn off all except 1
-                    print ('desligando %s' %idle[i+1])
-                    event_logger.logger.log(Event(
-                        timestamp=datetime.now().isoformat(),
-                        event_type='shutdown',
-                        hostname=idle[i+1],
-                        trigger_type=predict_model,
-                        ram_avg=ram_avg,
-                        lim_max=lim_max,
-                        lim_med=lim_med,
-                        running_hosts=len(running),
-                        idle_hosts=len(idle),
-                        offline_hosts=len(offline)
-                    ))
-                    changestate.shutdown(idle[i+1])
-        else:
-            if len(offline) > 0:				# If there are offline hosts ...
-                print('ligando %s' %offline[0])
-                # Get prediction values for LSTM wake events
-                pred_ram = None
-                act_ram = None
-                if predict_model == 'lstm' and predictions:
-                    # Average of all predictions
-                    all_preds = [p[0] for p in predictions.values() if p[0] is not None]
-                    all_actuals = [p[1] for p in predictions.values() if p[1] is not None]
-                    if all_preds:
-                        pred_ram = sum(all_preds) / len(all_preds)
-                    if all_actuals:
-                        act_ram = sum(all_actuals) / len(all_actuals)
 
-                event_logger.logger.log(Event(
-                    timestamp=datetime.now().isoformat(),
-                    event_type='wake',
-                    hostname=offline[0],
-                    trigger_type=predict_model,
-                    ram_avg=ram_avg,
-                    lim_max=lim_max,
-                    lim_med=lim_med,
-                    running_hosts=len(running),
-                    idle_hosts=len(idle),
-                    offline_hosts=len(offline),
-                    predicted_ram=pred_ram,
-                    actual_ram=act_ram
-                ))
-                changestate.wake(offline[0]) 			# Wake up the first offline host from the list
-            else:
-                if check_sla_violation(running, idle, offline, ram_avg, lim_max):
-                    event_logger.logger.log(Event(
-                        timestamp=datetime.now().isoformat(),
-                        event_type='sla_violation',
-                        hostname=None,
-                        trigger_type=predict_model,
-                        ram_avg=ram_avg,
-                        lim_max=lim_max,
-                        lim_med=lim_med,
-                        running_hosts=len(running),
-                        idle_hosts=len(idle),
-                        offline_hosts=len(offline)
-                    ))
-                print('SLA VIOLAÇÃO: Não há mais hosts offline para ligar.\nO sistema está no limite!!!')
+    # PREDICTIVE (lstm only): prediction > lim_max but real load still <= lim_max -> wake early
+    elif (predict_model == 'lstm' and avg_predicted is not None
+          and avg_predicted > lim_max and avg_actual <= lim_max
+          and len(idle) == 0 and len(offline) > 0):
+        predictive_host = offline[0]
+        print(f'PREDITIVO: previsão LSTM {avg_predicted:.1f}% > {lim_max}% (real {avg_actual:.1f}%). Acordando {predictive_host}...')
+        event_logger.logger.log(Event(
+            timestamp=datetime.now().isoformat(),
+            event_type='wake',
+            hostname=predictive_host,
+            trigger_type='lstm_predictive',
+            ram_avg=avg_actual,
+            lim_max=lim_max,
+            lim_med=lim_med,
+            running_hosts=len(running),
+            idle_hosts=len(idle),
+            offline_hosts=len(offline),
+            predicted_ram=avg_predicted,
+            actual_ram=avg_actual
+        ))
+        changestate.wake(predictive_host)
+
+    # REACTIVE: real load > lim_max, no idle buffer, offline available -> wake (default mode wakes here)
+    elif avg_actual > lim_max and len(idle) == 0 and len(offline) > 0:
+        reactive_host = offline[0]
+        print(f'REATIVO: carga real {avg_actual:.1f}% > {lim_max}%. Acordando {reactive_host}...')
+        event_logger.logger.log(Event(
+            timestamp=datetime.now().isoformat(),
+            event_type='wake',
+            hostname=reactive_host,
+            trigger_type='reactive',
+            ram_avg=avg_actual,
+            lim_max=lim_max,
+            lim_med=lim_med,
+            running_hosts=len(running),
+            idle_hosts=len(idle),
+            offline_hosts=len(offline),
+            predicted_ram=avg_predicted,
+            actual_ram=avg_actual
+        ))
+        changestate.wake(reactive_host)
+
+    # HIGH LOAD but cannot add capacity: keep idle hosts to absorb load (never shut down under high load)
+    elif avg_actual > lim_max:
+        if len(idle) > 0:
+            print(f'Carga alta ({avg_actual:.1f}%) com idle disponível para absorver — mantendo hosts idle.')
+        else:
+            print(f'Carga alta ({avg_actual:.1f}%) sem hosts offline para acordar — limite de capacidade.')
     else:
         if len(idle) > 0:
             if ram_avg >= lim_med:				## If RAM is between the medium and maximum limits

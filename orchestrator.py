@@ -196,10 +196,19 @@ class ExperimentOrchestrator:
 		import event_logger
 		from datetime import datetime
 
-		# Initialize event logger with model-specific filename
-		event_file = f'events_{self.predict_model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+		# Initialize event logger with model-specific filename (ts shared with cluster CSV)
+		ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+		event_file = f'events_{self.predict_model}_{ts}.json'
+		cluster_file = f'cluster_workload_{self.predict_model}_{ts}.csv'
 		event_logger.logger = event_logger.EventLogger(event_file)
 		print(f'   Event logging: {event_file}')
+		print(f'   Cluster workload logging: {cluster_file}')
+
+		# Log initial host state (also sets verifier.experiment_start_time for final_state)
+		try:
+			verifier.log_initial_state()
+		except Exception as e:
+			print(f'   ! Erro ao logar estado inicial: {e}')
 
 		# Start workload collection for registered hosts
 		try:
@@ -237,14 +246,64 @@ class ExperimentOrchestrator:
 		thread.start()
 		print('   ✓ Verifier iniciado em background')
 
+		# Cluster workload logger: samples real load + LSTM prediction into cluster_workload_*.csv
+		def cluster_workload_loop():
+			import csv, config, predict
+			try:
+				with open("registered.txt", "r") as rf:
+					lg = ast.literal_eval(rf.read())
+			except Exception:
+				lg = []
+			with open(cluster_file, 'w', newline='') as cf:
+				writer = csv.writer(cf)
+				writer.writerow(['time_stamp', 'ram_avg', 'running_hosts', 'idle_hosts', 'offline_hosts', 'predicted_ram'])
+				while self.verification_active and not self.cancelled:
+					try:
+						hosts = status.get()
+						running, idle, offline = verifier.classify_hosts(hosts, lg)
+						up_rams = [h['ram'] for h in hosts if h.get('state') == 'up']
+						ram_avg = sum(up_rams) / len(up_rams) if up_rams else 0.0
+						predicted = None
+						if self.predict_model == 'lstm':
+							preds = []
+							for h in hosts:
+								if h.get('state') == 'up':
+									try:
+										p = predict.lstm(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
+										if p is not None:
+											preds.append(p)
+									except Exception:
+										pass
+							predicted = sum(preds) / len(preds) if preds else None
+						writer.writerow([
+							datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+							f'{ram_avg:.2f}', len(running), len(idle), len(offline),
+							f'{predicted:.2f}' if predicted is not None else ''
+						])
+						cf.flush()
+					except Exception as e:
+						print(f'[Cluster Logger Error] {e}')
+					time.sleep(config.CLUSTER_SAMPLE_INTERVAL_S)
+
+		threading.Thread(target=cluster_workload_loop, daemon=True).start()
+		print('   ✓ Cluster workload logger iniciado em background')
+
+	def _duration_expired(self):
+		"""True quando --duration expirou; seta cancelled p/ parada graciosa (save_final_status)."""
+		if time.time() - self.inst_start >= self.experiment_duration:
+			self.cancelled = True
+			return True
+		return False
+
 	def start_instantiator(self):
 		"""Start VM instantiation - continuous create/delete loop like instances.py."""
 		print('\n[5/6] Iniciando instantiator (loop create/delete)...')
 		print(f'   Criando {self.num_vms} VMs, depois deletando e repetindo...')
 
+		self.inst_start = time.time()  # base para respeitar --duration
 		cycle = 0
 		try:
-			while not self.cancelled:
+			while not self.cancelled and (time.time() - self.inst_start) < self.experiment_duration:
 				cycle += 1
 				print(f'\n   === Ciclo {cycle} ===')
 
@@ -272,7 +331,7 @@ class ExperimentOrchestrator:
 
 					# Countdown 60s antes de cada criação
 					for countdown in range(60, -1, -1):
-						if self.cancelled:
+						if self.cancelled or self._duration_expired():
 							break
 						sys.stdout.write(f'Liga em: {countdown:3d}\r')
 						sys.stdout.flush()
@@ -306,7 +365,7 @@ class ExperimentOrchestrator:
 
 					# Countdown 60s antes de cada deleção
 					for countdown in range(60, -1, -1):
-						if self.cancelled:
+						if self.cancelled or self._duration_expired():
 							break
 						sys.stdout.write(f'Desliga em: {countdown:3d}\r')
 						sys.stdout.flush()
@@ -355,6 +414,18 @@ class ExperimentOrchestrator:
 	def save_final_status(self):
 		"""Save final experiment status."""
 		print('\n\n[FINAL] Salvando status final...')
+
+		# Log final host state and stop LSTM training (meaningful only after a verification run)
+		try:
+			verifier.log_final_state()
+		except Exception as e:
+			print(f'   ! Erro ao logar estado final: {e}')
+		try:
+			if self.predict_model == 'lstm':
+				import predict
+				predict.lstm_manager.stop_training()
+		except Exception as e:
+			print(f'   ! Erro ao parar LSTM training: {e}')
 
 		self.results['end_time'] = datetime.now().isoformat()
 		self.verification_active = False

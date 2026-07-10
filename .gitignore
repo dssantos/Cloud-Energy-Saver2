@@ -8,3 +8,10 @@ __pycache__/
 .env
 .venv/
 events_*.json
+
+# Analysis outputs (regenerable from events + cluster_workload CSVs)
+analysis_*.json
+TCC_METRICS_*.md
+
+# Logs
+*.log
