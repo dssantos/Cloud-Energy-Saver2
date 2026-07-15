@@ -88,10 +88,28 @@ class ExperimentOrchestrator:
 
 		return self.results['hosts_waked']
 
+	def _force_reset_host(self, host):
+		"""Força reset via VBoxManage no host Windows (poweroff + start)."""
+		import os
+		wh = os.getenv('WINDOWS_HOST')
+		wu = os.getenv('WINDOWS_USER')
+		if not wh or not wu:
+			print(f'   ⚠ WINDOWS_HOST/WINDOWS_USER não configurados, reset ignorado para {host}')
+			return
+		try:
+			print(f'   ⚡ Reset forçado VBoxManage: {host} (poweroff + startvm)')
+			__import__('subprocess').run(
+				f'ssh -o ConnectTimeout=10 {wu}@{wh} "VBoxManage controlvm {host} poweroff 2>/dev/null; sleep 3; VBoxManage startvm {host} --type=headless"',
+				shell=True, timeout=30, stdout=__import__('subprocess').DEVNULL, stderr=__import__('subprocess').DEVNULL)
+		except Exception as e:
+			print(f'   ⚠ Reset falhou para {host}: {e}')
+
 	def wait_hosts_ready(self, timeout=300):
-		"""Wait for controller and all computes to reach UP state."""
+		"""Wait for controller and all computes to reach UP state.
+		On timeout, force-reset stuck computes via VBoxManage and re-wait."""
 		print('\n[2/6] Aguardando hosts ficarem prontos...')
 		start = time.time()
+		force_reset_done = False
 
 		while time.time() - start < timeout:
 			if self.cancelled:
@@ -99,6 +117,7 @@ class ExperimentOrchestrator:
 
 			all_up = True
 			computes_up = 0
+			down_computes = []
 
 			try:
 				# Verificar via OpenStack se os computes estão UP
@@ -106,28 +125,44 @@ class ExperimentOrchestrator:
 				r = requests.get('http://controller:8774/v2.1/os-hypervisors',
 							   headers=header.get(), timeout=5)
 				hypervisors = __import__('json', fromlist=['loads']).loads(r.content)['hypervisors']
+				waked = set(self.results['hosts_waked'])
 
 				for hv in hypervisors:
 					hostname = hv['hypervisor_hostname']
-					if hostname in self.results['hosts_waked'] or 'compute' in hostname.lower():
+					if hostname in waked or 'compute' in hostname.lower():
 						if hv['state'] == 'up':
 							computes_up += 1
 						else:
 							all_up = False
+							down_computes.append(hostname)
 
-				# Verificar se temos pelo menos 3 computes UP
+				# hosts waked but not in hypervisor list -> also down
+				for h in waked:
+					if h.startswith('compute') and h not in {hv['hypervisor_hostname'] for hv in hypervisors}:
+						if h not in down_computes:
+							down_computes.append(h)
+
 				if computes_up >= 3:
 					all_up = True
 
 			except Exception as e:
-				# OpenStack ainda não está pronto, continuar aguardando
 				all_up = False
 
 			if all_up:
 				print(f'\n   ✓ Todos hosts prontos! ({computes_up}/3 computes UP)')
 				return True
 
-			# Show countdown
+			# Se passou metade do timeout e ainda há hosts DOWN, força reset uma vez
+			elapsed = time.time() - start
+			if not force_reset_done and elapsed > timeout * 0.5 and down_computes:
+				force_reset_done = True
+				print(f'\n   ⚠ Hosts DOWN após {elapsed:.0f}s: {down_computes}. Forçando reset VBoxManage...')
+				for host in down_computes:
+					self._force_reset_host(host)
+				# Zera o relógio para dar tempo de boot após reset
+				start = time.time()
+				continue
+
 			remaining = int(timeout - (time.time() - start))
 			print(f'\r   Aguardando... {remaining//60}m {remaining%60}s ({computes_up}/3 UP)  ', end='', flush=True)
 			time.sleep(5)
@@ -256,7 +291,11 @@ class ExperimentOrchestrator:
 				lg = []
 			with open(cluster_file, 'w', newline='') as cf:
 				writer = csv.writer(cf)
-				writer.writerow(['time_stamp', 'ram_avg', 'running_hosts', 'idle_hosts', 'offline_hosts', 'predicted_ram'])
+				per_host_cols = []
+				for h in lg:
+					per_host_cols.append(f'ram_{h}')
+					per_host_cols.append(f'vms_{h}')
+				writer.writerow(['time_stamp', 'ram_avg', 'running_hosts', 'idle_hosts', 'offline_hosts', 'predicted_ram'] + per_host_cols)
 				while self.verification_active and not self.cancelled:
 					try:
 						hosts = status.get()
@@ -275,11 +314,17 @@ class ExperimentOrchestrator:
 									except Exception:
 										pass
 							predicted = sum(preds) / len(preds) if preds else None
+						per_host_vals = []
+						host_map = {h['hostname']: h for h in hosts}
+						for h in lg:
+							hd = host_map.get(h, {})
+							per_host_vals.append(f"{hd.get('ram',0):.2f}" if hd.get('state')=='up' else '0.00')
+							per_host_vals.append(str(hd.get('vms',0)))
 						writer.writerow([
 							datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
 							f'{ram_avg:.2f}', len(running), len(idle), len(offline),
 							f'{predicted:.2f}' if predicted is not None else ''
-						])
+						] + per_host_vals)
 						cf.flush()
 					except Exception as e:
 						print(f'[Cluster Logger Error] {e}')

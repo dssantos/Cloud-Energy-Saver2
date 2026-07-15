@@ -265,13 +265,13 @@ def total_active_hours_aligned(events, duration_h):
 
 def sla_episodes(events, csv_df, duration_h):
     """
-    Count avoidable SLA episodes: sla_violation events (already transition-based)
-    with offline_hosts > 0 at violation time. Capacity-limit episodes (==0) are
-    excluded (they don't count against the model).
+    Count SLA episodes: sla_violation events (already per-host, transition-based
+    via verifier.sla_violating_hosts). trigger_type indicates the reason:
+    'ram_over_threshold' or 'host_inaccessible'.
     """
     events = _events_in_window(events, duration_h, csv_df)
     return len([e for e in events
-                if e['event_type'] == 'sla_violation' and (e.get('offline_hosts') or 0) > 0])
+                if e['event_type'] == 'sla_violation' and e.get('hostname') is not None])
 
 
 def energy_economy(hours_r, hours_l, p):
@@ -322,7 +322,7 @@ def build_report(window, r, l, lim_max, lim_med):
     lines.append(f"| Atraso de shutdown (min) | {r['late_shutdown_min']:.2f} | {l['late_shutdown_min']:.2f} |")
     lines.append(f"| Antecipação (min) | {r['anticipation_min']:.2f} | {l['anticipation_min']:.2f} |")
     lines.append(f"| Horas ativas (host·h) | {r['active_hours']:.2f} | {l['active_hours']:.2f} |")
-    lines.append(f"| Episódios SLA evitáveis | {r['sla_episodes']} | {l['sla_episodes']} |")
+    lines.append(f"| Episódios SLA | {r['sla_episodes']} | {l['sla_episodes']} |")
     lines.append('')
 
     reduction = (((r['active_hours'] - l['active_hours']) / r['active_hours'] * 100.0)

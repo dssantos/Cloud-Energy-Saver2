@@ -8,11 +8,12 @@ def get(host): # The method must receive a host
 
 		try:
 			# Add timeout to avoid hanging when host is down
-			output = subprocess.check_output(command, shell=True, timeout=5).decode()  # Receives the output of the above command
+			output = subprocess.check_output(command, shell=True, timeout=5,
+				stderr=subprocess.DEVNULL).decode()  # suppress SSH stderr noise when host is unreachable
 			mem_info = output.split() # Transforms strings of values separated by spaces in a list
 			ram_usage = float(mem_info[2])/float(mem_info[1])*100 # Calculates the percentage of RAM usage
 
-		except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+		except Exception:
 			ram_usage = 0.0  # If the host is not reached, the command will result in an error, so the RAM usage will be zero
 
 		return ram_usage

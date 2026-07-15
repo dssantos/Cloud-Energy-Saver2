@@ -40,4 +40,12 @@ SLA_TIMEOUT = 120  # segundos (também definido em instances.py)
 
 # --- Análise / coleta ---
 VALIDATION_WINDOW_MIN = 15        # janela para validar se um wake foi necessário
-CLUSTER_SAMPLE_INTERVAL_S = 20    # cadência do logger de cluster_workload
+CLUSTER_SAMPLE_INTERVAL_S = 10    # cadência do logger de cluster_workload (era 20; antecipação ~0.8 min pede mais resolução)
+
+# --- Anti-flapping ---
+EMERGENCY_COOLDOWN_SECONDS = 300   # após um wake emergencial, não desligar o host (também definido em verifier.py)
+SHUTDOWN_COOLDOWN_SECONDS = 300    # após um shutdown, não re-acordar o host (evita religamento/flapping)
+SHUTDOWN_FLAP_BLOCK_S = 60         # janela anti-flap: mesmo em emergency, não re-acordar host desligado há menos disso
+
+# --- SLA ---
+SLA_RAM_MARGIN_PCT = 10            # SLA #1 (ram_over_threshold): host > lim_max * (1 + this/100). Ex.: lim_max 80 -> 88%

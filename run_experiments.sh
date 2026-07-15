@@ -1,10 +1,28 @@
 #!/usr/bin/env bash
-# Roda default e lstm por ~1h cada (--duration 1, agora funcional) e ao final analisa.
-# Limpa VMs entre runs (loop: deleta, aguarda ~10s/instancia, re-verifica, repete).
-# Safety: timeout -s INT 4500 caso o corte gracioso trave.
+# Experimentos longos alternados para reduzir viés de deriva do ambiente.
+# Sequência padrão: default -> lstm -> default -> lstm (intercalado).
+#
+# Configurável por variáveis de ambiente:
+#   DUR_HOURS : horas por experimento (default 6; use 12 para runs mais longos)
+#   MODELS    : sequência de modelos (default "default lstm default lstm")
+#   NUM_VMS   : VMs por ciclo no instantiator (default 27)
+#
+# Limpa VMs entre runs (deleta, aguarda ~10s/instância, re-confere, repete).
+# Safety: timeout -s INT (DUR_HOURS*3600 + 900s) caso o corte gracoso do --duration trave.
+#
+# Exemplo:
+#   DUR_HOURS=12 bash run_experiments.sh
 set -u
 cd /home/danilo/dev/python/Cloud-Energy-Saver2
 PY=.venv/bin/python
+
+DUR_HOURS="${DUR_HOURS:-6}"
+MODELS="${MODELS:-default lstm default lstm}"
+NUM_VMS="${NUM_VMS:-27}"
+LIM_MAX="${LIM_MAX:-70}"
+LIM_MED="${LIM_MED:-50}"
+DUR_S=$(( DUR_HOURS * 3600 ))
+SAFETY_S=$(( DUR_S + 900 ))   # 15 min de folga sobre --duration
 
 cleanup_vms() {
   echo "[cleanup] removendo VMs remanescentes..."
@@ -31,33 +49,41 @@ print('[cleanup] concluido.')
 }
 
 echo "=== START $(date) ==="
+echo "DUR_HOURS=$DUR_HOURS  |  MODELS='$MODELS'  |  NUM_VMS=$NUM_VMS  |  LIM_MAX=$LIM_MAX LIM_MED=$LIM_MED"
 echo "python: $($PY --version 2>&1)"
 
-for MODEL in default lstm; do
+for MODEL in $MODELS; do
   echo ""
   echo "########## cleanup antes de MODEL=$MODEL ($(date)) ##########"
   cleanup_vms
   sleep 10
   echo ""
-  echo "########## MODEL=$MODEL  ($(date))  --duration 1 (3600s) ##########"
-  timeout -s INT 4500 $PY orchestrator.py --model "$MODEL" --lim-max 70 --lim-med 50 --num-vms 27 --duration 1
+  echo "########## MODEL=$MODEL  --duration $DUR_HOURS ($DUR_S s) ($(date)) ##########"
+  timeout -s INT "$SAFETY_S" $PY orchestrator.py \
+      --model "$MODEL" --lim-max "$LIM_MAX" --lim-med "$LIM_MED" \
+      --num-vms "$NUM_VMS" --duration "$DUR_HOURS"
   echo "########## MODEL=$MODEL finished exit=$? at $(date) ##########"
   sleep 15
 done
 
 echo ""
-echo "=== ANALYZE $(date) ==="
+echo "=== ANALYZE (par mais recente de cada modo) $(date) ==="
 REvents=$(ls -t events_default_*.json 2>/dev/null | head -1)
 RCsv=$(ls -t cluster_workload_default_*.csv 2>/dev/null | head -1)
 LEvents=$(ls -t events_lstm_*.json 2>/dev/null | head -1)
 LCsv=$(ls -t cluster_workload_lstm_*.csv 2>/dev/null | head -1)
 echo "reactive: $REvents  /  $RCsv"
 echo "lstm    : $LEvents  /  $LCsv"
+echo ""
+echo "Arquivos disponíveis para pares alternativos (análise manual):"
+echo "  default: $(ls -t events_default_*.json 2>/dev/null | tr '\n' ' ')"
+echo "  lstm   : $(ls -t events_lstm_*.json 2>/dev/null | tr '\n' ' ')"
+echo ""
 if [[ -n "$REvents" && -n "$RCsv" && -n "$LEvents" && -n "$LCsv" ]]; then
   $PY analyze_metrics.py \
     --reactive-events "$REvents" --reactive-csv "$RCsv" \
     --lstm-events "$LEvents" --lstm-csv "$LCsv" \
-    --lim-max 70 --lim-med 50 2>&1 | grep -v "absl\|cuda\|cudart\|InitializeLog"
+    --lim-max "$LIM_MAX" --lim-med "$LIM_MED" 2>&1 | grep -v "absl\|cuda\|cudart\|InitializeLog"
 else
   echo "ERROR: faltam arquivos de coleta para a análise."
 fi

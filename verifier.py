@@ -25,9 +25,18 @@ experiment_start_time = None
 emergency_wake_cooldowns = {}
 EMERGENCY_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after emergency wake
 
-# SLA violation transition tracking (edge detection across run() cycles).
-# Logs only on False->True transition, avoiding one event per cycle.
-last_sla_violated = False
+# Recent-shutdown cooldown tracking (anti-flapping: don't re-wake a host right after shutting it down)
+# Format: {hostname: timestamp_of_shutdown}
+recent_shutdown_cooldowns = {}
+
+# SLA violation: per-host transition tracking (edge detection across run() cycles).
+# False->True per host -> one event per episode per host.
+sla_violating_hosts = set()
+
+# Previous host state tracking: {hostname: (state, vms)}.  Used to detect unexpected
+# up->down transitions (crashes / hangs) that were NOT triggered by a verifier shutdown.
+# If a host was 'up' with VMs>0 and goes down, it generates an SLA host_down_unexpected.
+prev_host_state = {}
 
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
@@ -127,6 +136,42 @@ def is_in_cooldown(hostname):
     return True
 
 
+def is_in_shutdown_cooldown(hostname):
+    """Check if host is in recent-shutdown cooldown (anti-flapping: avoid re-waking right after a shutdown)."""
+    if hostname not in recent_shutdown_cooldowns:
+        return False
+    elapsed = time.time() - recent_shutdown_cooldowns[hostname]
+    if elapsed > config.SHUTDOWN_COOLDOWN_SECONDS:
+        del recent_shutdown_cooldowns[hostname]
+        return False
+    return True
+
+
+def select_wake_host(offline_list):
+    """Pick an offline host to wake, preferring those NOT in shutdown cooldown (anti-flapping).
+    offline_list is sorted ascending by host number (wake lower numbers first).
+    Fallback: if every offline host is in cooldown, wake the one shut down LONGEST ago
+    (earliest shutdown timestamp) so a genuine emergency is never fully blocked."""
+    candidates = [h for h in offline_list if not is_in_shutdown_cooldown(h)]
+    if candidates:
+        return candidates[0]
+    # All offline are in shutdown cooldown. Wake the one shut down longest ago, but ONLY if it
+    # is past the anti-flap window (SHUTDOWN_FLAP_BLOCK_S); otherwise return None so a genuine
+    # emergency waits instead of immediately re-waking the host it just shut down (shut->wake flap).
+    now = time.time()
+    past_antiflap = [h for h in offline_list
+                     if (now - recent_shutdown_cooldowns[h]) >= config.SHUTDOWN_FLAP_BLOCK_S]
+    if past_antiflap:
+        return min(past_antiflap, key=lambda h: recent_shutdown_cooldowns[h])
+    return None
+
+
+def shutdown_host(host):
+    """Shutdown a host and record the time (feeds the anti-flapping shutdown cooldown)."""
+    changestate.shutdown(host)
+    recent_shutdown_cooldowns[host] = time.time()
+
+
 def classify_hosts(hosts, registered):
     """
     Classify hosts into running / idle / offline lists (sorted).
@@ -204,20 +249,19 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
     return avg_ram, overloaded, normal, avg_predicted, avg_actual
 
 
-def check_sla_violation(running_hosts, idle_hosts, avg_actual, lim_max):
-    """
-    SLA violation: real cluster load is high and there is no idle buffer to absorb it.
+def detect_sla_violations(hosts, lim_max):
+    """SLA #1 (ram_over_threshold): host RAM > lim_max * (1 + SLA_RAM_MARGIN_PCT/100).
 
-    Uses avg_actual (real load of all active hosts) instead of the decision avg_ram,
-    which collapses to 0 under overload. `offline` presence at violation time is
-    captured in the logged event to classify the episode as avoidable (offline>0)
-    vs capacity limit (offline==0).
+    Returns: dict hostname -> ('ram_over_threshold', ram) for currently violating hosts.
+    SLA #4 (host_down_unexpected) is handled separately in run() via prev_host_state.
     """
-    if avg_actual > lim_max and len(idle_hosts) == 0:
-        return True
-    if len(running_hosts) == 0 and avg_actual > lim_max:
-        return True
-    return False
+    threshold = lim_max * (1 + config.SLA_RAM_MARGIN_PCT / 100.0)
+    violating = {}
+    for host in hosts:
+        h = host['hostname']
+        if host['state'] == 'up' and host['ram'] > threshold:
+            violating[h] = ('ram_over_threshold', host['ram'])
+    return violating
 
 
 def log_initial_state():
@@ -289,7 +333,7 @@ def log_final_state():
 
 
 def run(lim_max, lim_med, predict_model):
-    global last_sla_violated
+    global sla_violating_hosts
 
     hosts = status.get()
 
@@ -300,6 +344,22 @@ def run(lim_max, lim_med, predict_model):
     except:
         print('É preciso registrar os hosts do ambiente')
         registered = []
+
+    # Detect unexpected up->down transitions (crash / hang, not verifier-commanded shutdown).
+    # Hosts that were up with VMs>0 and went down unexpectedly generate SLA host_down_unexpected.
+    global prev_host_state
+    unexpected_downs = {}
+    for host in hosts:
+        h = host['hostname']
+        prev = prev_host_state.get(h, ('unknown', 0))
+        curr_state = host['state']
+        curr_vms = host.get('vms', 0)
+        prev_state, prev_vms = prev if isinstance(prev, tuple) else (prev, 0)
+        if prev_state == 'up' and curr_state != 'up':
+            print(f'[STATE] {h} up->down (INESPERADO): ram={host.get("ram",0):.1f}% vms={curr_vms} (antes: {prev_vms}) — possível crash/travamento por sobrecarga.')
+            if prev_vms > 0:
+                unexpected_downs[h] = ('host_down_unexpected', 0.0)
+        prev_host_state[h] = (curr_state, curr_vms)
 
     running, idle, offline = classify_hosts(hosts, registered)
 
@@ -316,93 +376,105 @@ def run(lim_max, lim_med, predict_model):
     print('média de ram (decisão): %s' % ram_avg)
     print(f'média real (avg_actual): {avg_actual:.1f}%')
 
-    # SLA violation: log only on False->True transition (not every cycle).
-    # offline_hosts captured at violation time -> avoidable (>0) vs capacity limit (==0).
-    current_sla = check_sla_violation(running, idle, avg_actual, lim_max)
-    if current_sla and not last_sla_violated:
-        kind = 'EVITÁVEL (hosts offline disponíveis)' if len(offline) > 0 else 'LIMITE DE CAPACIDADE'
-        print(f'SLA VIOLAÇÃO [{kind}]: carga real {avg_actual:.1f}% > {lim_max}% sem idle ocioso.')
+    # SLA: per-host, transition-based (False->True per host). Two conditions:
+    # 1) host RAM > lim_max * (1 + SLA_RAM_MARGIN_PCT/100)  --  ram_over_threshold
+    # 4) host was up with VMs>0 last cycle and is now down without a verifier shutdown  --  host_down_unexpected
+    current_violating = detect_sla_violations(hosts, lim_max)
+    current_violating.update(unexpected_downs)
+    new_violations = {h: v for h, v in current_violating.items() if h not in sla_violating_hosts}
+    for h, (reason, ram) in new_violations.items():
+        sla_thr = lim_max * (1 + config.SLA_RAM_MARGIN_PCT / 100.0)
+        print(f'SLA VIOLAÇÃO [{reason}]: host={h} ram={ram:.1f}% (threshold={sla_thr:.1f}%)')
         event_logger.logger.log(Event(
             timestamp=datetime.now().isoformat(),
             event_type='sla_violation',
-            hostname=None,
-            trigger_type=predict_model,
-            ram_avg=avg_actual,
+            hostname=h,
+            trigger_type=reason,
+            ram_avg=ram,
             lim_max=lim_max,
             lim_med=lim_med,
             running_hosts=len(running),
             idle_hosts=len(idle),
             offline_hosts=len(offline),
             predicted_ram=avg_predicted,
-            actual_ram=avg_actual
+            actual_ram=ram
         ))
-    last_sla_violated = current_sla
+    sla_violating_hosts = set(current_violating.keys())
 
 ## Logic of the management of the hosts to be turned on and off
 
     # EMERGENCY: all normal hosts overloaded and offline hosts available
     if len(overloaded) > 0 and len(normal) == 0 and len(offline) > 0:
-        emergency_host = offline[0]
-        print(f'EMERGÊNCIA: Todos os hosts normais sobrecarregados! Acordando {emergency_host}...')
-        event_logger.logger.log(Event(
-            timestamp=datetime.now().isoformat(),
-            event_type='wake',
-            hostname=emergency_host,
-            trigger_type=f'{predict_model}_emergency',
-            ram_avg=avg_actual,
-            lim_max=lim_max,
-            lim_med=lim_med,
-            running_hosts=len(running),
-            idle_hosts=len(idle),
-            offline_hosts=len(offline),
-            predicted_ram=avg_predicted,
-            actual_ram=avg_actual
-        ))
-        # Set cooldown to prevent immediate shutdown
-        emergency_wake_cooldowns[emergency_host] = time.time()
-        changestate.wake(emergency_host)
+        emergency_host = select_wake_host(offline)
+        if emergency_host is None:
+            print('EMERGÊNCIA: offline em anti-flap (recém-desligados) — aguardando ao invés de re-acordar (SLA já registrado).')
+        else:
+            print(f'EMERGÊNCIA: Todos os hosts normais sobrecarregados! Acordando {emergency_host}...')
+            event_logger.logger.log(Event(
+                timestamp=datetime.now().isoformat(),
+                event_type='wake',
+                hostname=emergency_host,
+                trigger_type=f'{predict_model}_emergency',
+                ram_avg=avg_actual,
+                lim_max=lim_max,
+                lim_med=lim_med,
+                running_hosts=len(running),
+                idle_hosts=len(idle),
+                offline_hosts=len(offline),
+                predicted_ram=avg_predicted,
+                actual_ram=avg_actual
+            ))
+            # Set cooldown to prevent immediate shutdown
+            emergency_wake_cooldowns[emergency_host] = time.time()
+            changestate.wake(emergency_host)
 
     # PREDICTIVE (lstm only): prediction > lim_max but real load still <= lim_max -> wake early
     elif (predict_model == 'lstm' and avg_predicted is not None
           and avg_predicted > lim_max and avg_actual <= lim_max
           and len(idle) == 0 and len(offline) > 0):
-        predictive_host = offline[0]
-        print(f'PREDITIVO: previsão LSTM {avg_predicted:.1f}% > {lim_max}% (real {avg_actual:.1f}%). Acordando {predictive_host}...')
-        event_logger.logger.log(Event(
-            timestamp=datetime.now().isoformat(),
-            event_type='wake',
-            hostname=predictive_host,
-            trigger_type='lstm_predictive',
-            ram_avg=avg_actual,
-            lim_max=lim_max,
-            lim_med=lim_med,
-            running_hosts=len(running),
-            idle_hosts=len(idle),
-            offline_hosts=len(offline),
-            predicted_ram=avg_predicted,
-            actual_ram=avg_actual
-        ))
-        changestate.wake(predictive_host)
+        predictive_host = select_wake_host(offline)
+        if predictive_host is None:
+            print('PREDITIVO: offline em anti-flap (recém-desligados) — aguardando.')
+        else:
+            print(f'PREDITIVO: previsão LSTM {avg_predicted:.1f}% > {lim_max}% (real {avg_actual:.1f}%). Acordando {predictive_host}...')
+            event_logger.logger.log(Event(
+                timestamp=datetime.now().isoformat(),
+                event_type='wake',
+                hostname=predictive_host,
+                trigger_type='lstm_predictive',
+                ram_avg=avg_actual,
+                lim_max=lim_max,
+                lim_med=lim_med,
+                running_hosts=len(running),
+                idle_hosts=len(idle),
+                offline_hosts=len(offline),
+                predicted_ram=avg_predicted,
+                actual_ram=avg_actual
+            ))
+            changestate.wake(predictive_host)
 
     # REACTIVE: real load > lim_max, no idle buffer, offline available -> wake (default mode wakes here)
     elif avg_actual > lim_max and len(idle) == 0 and len(offline) > 0:
-        reactive_host = offline[0]
-        print(f'REATIVO: carga real {avg_actual:.1f}% > {lim_max}%. Acordando {reactive_host}...')
-        event_logger.logger.log(Event(
-            timestamp=datetime.now().isoformat(),
-            event_type='wake',
-            hostname=reactive_host,
-            trigger_type='reactive',
-            ram_avg=avg_actual,
-            lim_max=lim_max,
-            lim_med=lim_med,
-            running_hosts=len(running),
-            idle_hosts=len(idle),
-            offline_hosts=len(offline),
-            predicted_ram=avg_predicted,
-            actual_ram=avg_actual
-        ))
-        changestate.wake(reactive_host)
+        reactive_host = select_wake_host(offline)
+        if reactive_host is None:
+            print('REATIVO: offline em anti-flap (recém-desligados) — aguardando.')
+        else:
+            print(f'REATIVO: carga real {avg_actual:.1f}% > {lim_max}%. Acordando {reactive_host}...')
+            event_logger.logger.log(Event(
+                timestamp=datetime.now().isoformat(),
+                event_type='wake',
+                hostname=reactive_host,
+                trigger_type='reactive',
+                ram_avg=avg_actual,
+                lim_max=lim_max,
+                lim_med=lim_med,
+                running_hosts=len(running),
+                idle_hosts=len(idle),
+                offline_hosts=len(offline),
+                predicted_ram=avg_predicted,
+                actual_ram=avg_actual
+            ))
+            changestate.wake(reactive_host)
 
     # HIGH LOAD but cannot add capacity: keep idle hosts to absorb load (never shut down under high load)
     elif avg_actual > lim_max:
@@ -431,7 +503,7 @@ def run(lim_max, lim_med, predict_model):
                         idle_hosts=len(idle),
                         offline_hosts=len(offline)
                     ))
-                    changestate.shutdown(host)
+                    shutdown_host(host)
             else:
                 if len(running) >= 1:		## If there is at least 1 active host
                     # Filter out hosts in cooldown - never shut down emergency hosts
@@ -456,7 +528,7 @@ def run(lim_max, lim_med, predict_model):
                             idle_hosts=len(idle),
                             offline_hosts=len(offline)
                         ))
-                        changestate.shutdown(host)		# shut down all idle hosts
+                        shutdown_host(host)		# shut down all idle hosts
                 else:								# Else...
                     # Filter out hosts in cooldown
                     idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
@@ -476,7 +548,7 @@ def run(lim_max, lim_med, predict_model):
                             idle_hosts=len(idle),
                             offline_hosts=len(offline)
                         ))
-                        changestate.shutdown(host)
+                        shutdown_host(host)
 
 def start(lim_max, lim_med, predict_model, continuous=False):
     global lstm_manager, experiment_start_time
