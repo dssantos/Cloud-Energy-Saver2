@@ -24,6 +24,13 @@ LIM_MED="${LIM_MED:-50}"
 DUR_S=$(( DUR_HOURS * 3600 ))
 SAFETY_S=$(( DUR_S + 900 ))   # 15 min de folga sobre --duration
 
+# Timestamped log filename + symlink para convenience (tail -f experiment_run.log funciona)
+TS=$(date +%Y%m%d_%H%M%S)
+LOG="experiment_run_${TS}.log"
+ln -sf "$LOG" experiment_run.log
+# Redireciona toda a saída para o arquivo timestampado
+exec > "$LOG" 2>&1
+
 cleanup_vms() {
   echo "[cleanup] removendo VMs remanescentes..."
   $PY -c "

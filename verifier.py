@@ -38,6 +38,21 @@ sla_violating_hosts = set()
 # If a host was 'up' with VMs>0 and goes down, it generates an SLA host_down_unexpected.
 prev_host_state = {}
 
+# Stuck-host reset cooldowns: {hostname: timestamp_of_last_reset}. Prevents repeated
+# VBoxManage resets of the same host within STUCK_RESET_COOLDOWN_S.
+host_reset_cooldowns = {}
+
+
+def is_in_reset_cooldown(hostname):
+    """True se o host foi resetado há menos de STUCK_RESET_COOLDOWN_S (não re-resetar)."""
+    if hostname not in host_reset_cooldowns:
+        return False
+    elapsed = time.time() - host_reset_cooldowns[hostname]
+    if elapsed > config.STUCK_RESET_COOLDOWN_S:
+        del host_reset_cooldowns[hostname]
+        return False
+    return True
+
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
     """
@@ -170,6 +185,8 @@ def shutdown_host(host):
     """Shutdown a host and record the time (feeds the anti-flapping shutdown cooldown)."""
     changestate.shutdown(host)
     recent_shutdown_cooldowns[host] = time.time()
+    # Mark as intentionally shut down so prev_host_state doesn't flag it as unexpected
+    prev_host_state[host] = ('down', 0)
 
 
 def classify_hosts(hosts, registered):
@@ -360,6 +377,18 @@ def run(lim_max, lim_med, predict_model):
             if prev_vms > 0:
                 unexpected_downs[h] = ('host_down_unexpected', 0.0)
         prev_host_state[h] = (curr_state, curr_vms)
+
+    # Stuck-host auto-reset: host com vms > threshold E (down OU ram==0) -> reset VBoxManage
+    # (uma vez por cooldown, em background thread para não bloquear o ciclo)
+    for host in hosts:
+        h = host['hostname']
+        vms = host.get('vms', 0) or 0
+        if vms > config.STUCK_HOST_VM_THRESHOLD and (host['state'] != 'up' or host.get('ram', 0) == 0):
+            if is_in_reset_cooldown(h):
+                continue
+            print(f'[STUCK] {h} travado (vms={vms} state={host["state"]} ram={host.get("ram",0)}) -> reset forçado em background.')
+            host_reset_cooldowns[h] = time.time()
+            threading.Thread(target=changestate.force_reset, args=(h,), daemon=True).start()
 
     running, idle, offline = classify_hosts(hosts, registered)
 

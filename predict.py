@@ -309,30 +309,16 @@ def select_best_model(hostname):
     if not model_losses:
         return None
 
-    # Load incoherence counts
-    incoherence_counts = load_incoherence_counts(hostname)
+    # Sort by validation loss (lowest = best) and return best
+    model_losses.sort(key=lambda x: x[0])
+    best_model = model_losses[0][1]
+    for loss, model_file in model_losses[:5]:
+        print(f'[MODEL SCORE] {model_file}: loss={loss:.6f}')
 
-    # Calculate effective score (loss + incoherence penalty)
-    model_scores = []
-    for loss, model_file in model_losses:
-        incoherence_count = incoherence_counts.get(model_file, 0)
-        effective_score = loss + (incoherence_count * PENALTY_FACTOR)
-        model_scores.append((effective_score, loss, model_file))
-        print(f'[MODEL SCORE] {model_file}: loss={loss:.6f}, incoherences={incoherence_count}, score={effective_score:.6f}')
-
-    # Sort by effective score and return best
-    model_scores.sort(key=lambda x: x[0])
-    best_model = model_scores[0][2]  # Return filename with best score
-
-    # Keep only 20 best models, delete rest
+    # Keep only 20 best models (lowest loss), delete rest
     for loss, worst_file in model_losses[20:]:
         try:
             os.remove(f'{model_dir}/{worst_file}')
-            # Clean up incoherence count for deleted model
-            counts = load_incoherence_counts(hostname)
-            if worst_file in counts:
-                del counts[worst_file]
-                save_incoherence_counts(hostname, counts)
         except OSError:
             pass
 
@@ -547,22 +533,6 @@ def lstm(hostname, steps_ahead=6):
 
                 # Make prediction (direct, not iterative)
                 predict = best_model.predict(x_input, verbose=0)[0][0]
-
-                # Validation: Check if prediction is coherent with last value
-                if len(df) > 0:
-                    last_value = df.iloc[-1]['mem']
-                    diff = abs(predict - last_value)
-
-                    if diff > 15 and diff > abs(predict) * 0.15:
-                        # Prediction too different from last value, use current RAM
-                        actual_ram = ram_usage.get(hostname)
-                        print(f'[PREDICTION INCOHERENT] {hostname}: LSTM={predict:.2f}, Last={last_value:.2f}, Diff={diff:.2f}, Using RAM: {actual_ram:.2f}')
-
-                        # Track this incoherence for the model
-                        increment_incoherence(hostname, model_file)
-
-                        return actual_ram
-
                 print(f'LSTM prediction for {hostname}: {predict:.2f} (model: {model_file}, steps_ahead: {steps_ahead})')
                 return predict
             else:
@@ -577,42 +547,8 @@ def lstm(hostname, steps_ahead=6):
         return ram_usage.get(hostname)
 
 # ============================================================================
-# Incoherence Tracking System
+# Coherence analysis removed: models are now selected by validation loss only.
 # ============================================================================
-
-INCOHERENCE_FILE = './models/{hostname}/.incoherence_count.json'
-PENALTY_FACTOR = 0.5  # Each incoherence adds 0.5 to effective loss (gradual penalty)
-
-
-def load_incoherence_counts(hostname):
-    """Load incoherence counts from disk."""
-    incoherence_file = INCOHERENCE_FILE.format(hostname=hostname)
-    try:
-        if os.path.exists(incoherence_file):
-            with open(incoherence_file, 'r') as f:
-                return json.load(f)
-    except (IOError, json.JSONDecodeError):
-        pass
-    return {}
-
-
-def save_incoherence_counts(hostname, counts):
-    """Save incoherence counts to disk."""
-    incoherence_file = INCOHERENCE_FILE.format(hostname=hostname)
-    try:
-        os.makedirs(os.path.dirname(incoherence_file), exist_ok=True)
-        with open(incoherence_file, 'w') as f:
-            json.dump(counts, f)
-    except IOError:
-        pass
-
-
-def increment_incoherence(hostname, model_file):
-    """Increment incoherence count for a specific model."""
-    counts = load_incoherence_counts(hostname)
-    counts[model_file] = counts.get(model_file, 0) + 1
-    save_incoherence_counts(hostname, counts)
-    print(f'[INCOHERENCE TRACKING] {hostname}: {model_file} now has {counts[model_file]} incoherences')
 
 
 # ============================================================================
