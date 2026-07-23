@@ -69,7 +69,7 @@ def split_dataframes(df):
 def split_sequence(sequence, n_steps, steps_ahead=1):
     """
     Split sequence into input/output samples.
-    steps_ahead: How many steps ahead to predict (1=next, 6=3min)
+    steps_ahead: How many steps ahead to predict (1=next, 2=1min)
     """
     X, y = list(), list()
     for i in range(len(sequence)):
@@ -166,7 +166,7 @@ def update_model_loss(hostname, model_file, actual_loss):
         print(f'[ERROR] Failed to rename model {model_file}: {e}')
         return None
 
-def train_lstm_model(hostname, steps_ahead=6):
+def train_lstm_model(hostname, steps_ahead=2):
     """Train LSTM model with configurable prediction horizon."""
     import os  # Import at function level to avoid UnboundLocalError
     try:
@@ -443,7 +443,7 @@ class LSTMTrainingManager:
                 # This allows training even when data has gaps that create smaller segments
                 if len(df) > 100:
                     print(f'[TRAINING LOOP] {hostname}: Condições atendidas - df: {len(df)} (last_df: {len(last_df)})')
-                    model = train_lstm_model(hostname, steps_ahead=6)
+                    model = train_lstm_model(hostname, steps_ahead=2)
 
                     if model:
                         # Validate prediction quality
@@ -494,14 +494,14 @@ class LSTMTrainingManager:
                 sleep(30)
 
 
-def lstm(hostname, steps_ahead=6):
+def lstm(hostname, steps_ahead=2):
     """
     Non-blocking LSTM prediction using best available model.
     Never blocks on training operations - uses cached model or falls back gracefully.
 
     Args:
         hostname: Hostname to predict RAM for
-        steps_ahead: Number of steps ahead to predict (default: 6 for 3 minutes)
+        steps_ahead: Number of steps ahead to predict (default: 2 for 1 minute)
 
     Returns:
         Predicted RAM value or current RAM as fallback

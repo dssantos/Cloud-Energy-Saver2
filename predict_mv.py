@@ -128,7 +128,7 @@ def _scale(arr2d, mn, mx):
     return (arr2d - mn) / (mx - mn)
 
 
-def train_lstm_model_mv(hostname, steps_ahead=6):
+def train_lstm_model_mv(hostname, steps_ahead=2):
     """Train one multivariate LSTM model for a host and save it."""
     os.makedirs(f'{MODEL_DIR}/{hostname}', exist_ok=True)
     try:
@@ -228,7 +228,7 @@ def select_best_model_mv(hostname):
     return best
 
 
-def lstm_mv(hostname, steps_ahead=6):
+def lstm_mv(hostname, steps_ahead=2):
     """Predict mem steps_ahead ahead using the best multivariate model.
 
     Returns the predicted mem (%), or None if no model / not enough data.
@@ -299,7 +299,7 @@ class MVLSTMTrainingManager:
     def _train_loop(self, hostname):
         while True:
             try:
-                train_lstm_model_mv(hostname, steps_ahead=6)
+                train_lstm_model_mv(hostname, steps_ahead=2)
             except Exception as e:
                 print(f'[MV TRAIN LOOP ERROR] {hostname}: {e}')
             sleep(TRAIN_INTERVAL_S)

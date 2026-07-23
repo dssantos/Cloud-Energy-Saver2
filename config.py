@@ -33,7 +33,7 @@ LIM_MAX = 70.0
 LIM_MED = 30.0
 
 # --- Predição ---
-STEPS_AHEAD = 6  # 3 min à frente (já é o default em predict.py / verifier.py)
+STEPS_AHEAD = 2  # 1 min à frente (já é o default em predict.py / verifier.py)
 
 # --- SLA ---
 SLA_TIMEOUT = 120  # segundos (também definido em instances.py)
@@ -49,7 +49,3 @@ SHUTDOWN_FLAP_BLOCK_S = 60         # janela anti-flap: mesmo em emergency, não 
 
 # --- SLA ---
 SLA_RAM_MARGIN_PCT = 10            # SLA #1 (ram_over_threshold): host > lim_max * (1 + this/100). Ex.: lim_max 80 -> 88%
-
-# --- Stuck host auto-reset ---
-STUCK_HOST_VM_THRESHOLD = 10       # host com mais VMs que isso E (down ou ram==0) = travado -> reset forçado
-STUCK_RESET_COOLDOWN_S = 300       # não re-resetar o mesmo host dentro desta janela
