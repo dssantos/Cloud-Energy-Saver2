@@ -28,6 +28,7 @@ warnings.filterwarnings('ignore')
 _stderr = io.StringIO()
 with redirect_stderr(_stderr):
     from random import choice
+    from time import sleep
     from numpy import array, concatenate, where, exp, log1p, clip
     from keras.models import Sequential, load_model
     from keras.layers import LSTM, Dense, Dropout
