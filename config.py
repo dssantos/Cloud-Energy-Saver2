@@ -43,9 +43,10 @@ VALIDATION_WINDOW_MIN = 15        # janela para validar se um wake foi necessár
 CLUSTER_SAMPLE_INTERVAL_S = 10    # cadência do logger de cluster_workload (era 20; antecipação ~0.8 min pede mais resolução)
 
 # --- Anti-flapping ---
-EMERGENCY_COOLDOWN_SECONDS = 300   # após um wake emergencial, não desligar o host (também definido em verifier.py)
-SHUTDOWN_COOLDOWN_SECONDS = 300    # após um shutdown, não re-acordar o host (evita religamento/flapping)
-SHUTDOWN_FLAP_BLOCK_S = 60         # janela anti-flap: mesmo em emergency, não re-acordar host desligado há menos disso
+WAKE_GRACE_SECONDS = 300             # após QUALQUER wake, não desligar o host (dá tempo ao instantiator)
+SHUTDOWN_COOLDOWN_SECONDS = 300      # após um shutdown, não re-acordar o host (evita religamento/flapping)
+SHUTDOWN_FLAP_BLOCK_S = 60           # janela anti-flap: mesmo em emergency, não re-acordar host desligado há menos disso
+IDLE_DELETE_RECENCY_S = 180          # se VMs foram deletadas do host há menos disso, é ocioso genuíno -> pode desligar
 
 # --- SLA ---
 SLA_RAM_MARGIN_PCT = 10            # SLA #1 (ram_over_threshold): host > lim_max * (1 + this/100). Ex.: lim_max 80 -> 88%

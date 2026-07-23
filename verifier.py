@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 import workload, predict
 import event_logger
+import host_metrics
 import config
 from event_logger import Event
 
@@ -20,10 +21,11 @@ load_dotenv()
 lstm_manager = None
 experiment_start_time = None
 
-# Emergency wake cooldown tracking
+# Unified wake tracking: ALL wake branches (emergency, predictive, reactive) record
+# the wake time here so that recently-woken hosts are protected from immediate
+# shutdown (gives the instantiator time to place VMs on them).
 # Format: {hostname: timestamp_of_wake}
-emergency_wake_cooldowns = {}
-EMERGENCY_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after emergency wake
+wake_times = {}
 
 # Recent-shutdown cooldown tracking (anti-flapping: don't re-wake a host right after shutting it down)
 # Format: {hostname: timestamp_of_shutdown}
@@ -37,21 +39,6 @@ sla_violating_hosts = set()
 # up->down transitions (crashes / hangs) that were NOT triggered by a verifier shutdown.
 # If a host was 'up' with VMs>0 and goes down, it generates an SLA host_down_unexpected.
 prev_host_state = {}
-
-# Stuck-host reset cooldowns: {hostname: timestamp_of_last_reset}. Prevents repeated
-# VBoxManage resets of the same host within STUCK_RESET_COOLDOWN_S.
-host_reset_cooldowns = {}
-
-
-def is_in_reset_cooldown(hostname):
-    """True se o host foi resetado há menos de STUCK_RESET_COOLDOWN_S (não re-resetar)."""
-    if hostname not in host_reset_cooldowns:
-        return False
-    elapsed = time.time() - host_reset_cooldowns[hostname]
-    if elapsed > config.STUCK_RESET_COOLDOWN_S:
-        del host_reset_cooldowns[hostname]
-        return False
-    return True
 
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
@@ -139,14 +126,13 @@ def wait_for_state_change(hostname, target_state, timeout=300, details_collector
     return False
 
 
-def is_in_cooldown(hostname):
-    """Check if host is in emergency wake cooldown period."""
-    if hostname not in emergency_wake_cooldowns:
+def is_in_wake_grace(hostname):
+    """Check if host was recently woken and should be protected from shutdown."""
+    if hostname not in wake_times:
         return False
-    elapsed = time.time() - emergency_wake_cooldowns[hostname]
-    if elapsed > EMERGENCY_COOLDOWN_SECONDS:
-        # Cooldown expired, remove from tracking
-        del emergency_wake_cooldowns[hostname]
+    elapsed = time.time() - wake_times[hostname]
+    if elapsed > config.WAKE_GRACE_SECONDS:
+        del wake_times[hostname]
         return False
     return True
 
@@ -246,8 +232,19 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
             actual_values.append(actual)  # live reading (real load)
             ram_val = actual
             if predict_model == 'lstm':
-                ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
-                predicted_values.append(ram_val)  # reuse the same prediction call
+                # Try multivariate model first (more features, better anticipation if trained)
+                try:
+                    import predict_mv
+                    mv_pred = predict_mv.lstm_mv(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
+                    if mv_pred is not None:
+                        ram_val = mv_pred
+                        predicted_values.append(ram_val)
+                    else:
+                        ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
+                        predicted_values.append(ram_val)
+                except Exception:
+                    ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
+                    predicted_values.append(ram_val)
             elif predict_model == 'naive':
                 ram_val = predict.naive(host['hostname'])
             elif predict_model == 'arima':
@@ -378,18 +375,6 @@ def run(lim_max, lim_med, predict_model):
                 unexpected_downs[h] = ('host_down_unexpected', 0.0)
         prev_host_state[h] = (curr_state, curr_vms)
 
-    # Stuck-host auto-reset: host com vms > threshold E (down OU ram==0) -> reset VBoxManage
-    # (uma vez por cooldown, em background thread para não bloquear o ciclo)
-    for host in hosts:
-        h = host['hostname']
-        vms = host.get('vms', 0) or 0
-        if vms > config.STUCK_HOST_VM_THRESHOLD and (host['state'] != 'up' or host.get('ram', 0) == 0):
-            if is_in_reset_cooldown(h):
-                continue
-            print(f'[STUCK] {h} travado (vms={vms} state={host["state"]} ram={host.get("ram",0)}) -> reset forçado em background.')
-            host_reset_cooldowns[h] = time.time()
-            threading.Thread(target=changestate.force_reset, args=(h,), daemon=True).start()
-
     running, idle, offline = classify_hosts(hosts, registered)
 
     # ram_avg: decision metric (normal hosts only)
@@ -453,8 +438,8 @@ def run(lim_max, lim_med, predict_model):
                 predicted_ram=avg_predicted,
                 actual_ram=avg_actual
             ))
-            # Set cooldown to prevent immediate shutdown
-            emergency_wake_cooldowns[emergency_host] = time.time()
+            # Record wake time (unified) to prevent immediate shutdown
+            wake_times[emergency_host] = time.time()
             changestate.wake(emergency_host)
 
     # PREDICTIVE (lstm only): prediction > lim_max but real load still <= lim_max -> wake early
@@ -481,6 +466,7 @@ def run(lim_max, lim_med, predict_model):
                 actual_ram=avg_actual
             ))
             changestate.wake(predictive_host)
+            wake_times[predictive_host] = time.time()
 
     # REACTIVE: real load > lim_max, no idle buffer, offline available -> wake (default mode wakes here)
     elif avg_actual > lim_max and len(idle) == 0 and len(offline) > 0:
@@ -504,6 +490,7 @@ def run(lim_max, lim_med, predict_model):
                 actual_ram=avg_actual
             ))
             changestate.wake(reactive_host)
+            wake_times[reactive_host] = time.time()
 
     # HIGH LOAD but cannot add capacity: keep idle hosts to absorb load (never shut down under high load)
     elif avg_actual > lim_max:
@@ -514,12 +501,20 @@ def run(lim_max, lim_med, predict_model):
     else:
         if len(idle) > 0:
             if ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
-                # Filter out hosts in cooldown
-                idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
-                # Keep at least 1 host (either not in cooldown or the first one)
-                shutdown_candidates = idle_non_cooldown[:-1] if len(idle_non_cooldown) > 1 else []
+                # Filter out hosts in wake grace (recently woken -> protect from shutdown)
+                idle_ok = [h for h in idle if not is_in_wake_grace(h)]
+                grace_hosts = [h for h in idle if is_in_wake_grace(h)]
+                for h in grace_hosts:
+                    remaining = config.WAKE_GRACE_SECONDS - (time.time() - wake_times[h])
+                    print(f'[WAKE GRACE] {h} protegido por {remaining:.0f}s (wake recente)')
+                # Keep at least 1 host (either not in grace or the first one)
+                shutdown_candidates = idle_ok[:-1] if len(idle_ok) > 1 else []
                 for host in shutdown_candidates:	# Turn off all except 1
-                    print('desligando %s' % host)
+                    reason = ''
+                    ds = host_metrics.secs_since_delete(host)
+                    if ds < config.IDLE_DELETE_RECENCY_S:
+                        reason = f' (VMs deletadas há {ds:.0f}s — ocioso genuíno)'
+                    print('desligando %s%s' % (host, reason))
                     event_logger.logger.log(Event(
                         timestamp=datetime.now().isoformat(),
                         event_type='shutdown',
@@ -535,16 +530,17 @@ def run(lim_max, lim_med, predict_model):
                     shutdown_host(host)
             else:
                 if len(running) >= 1:		## If there is at least 1 active host
-                    # Filter out hosts in cooldown - never shut down emergency hosts
-                    idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
-                    cooldown_hosts = [h for h in idle if is_in_cooldown(h)]
-                    # Log cooldown protected hosts
-                    for host in cooldown_hosts:
-                        elapsed = time.time() - emergency_wake_cooldowns[host]
-                        remaining = EMERGENCY_COOLDOWN_SECONDS - elapsed
-                        print(f'[COOLDOWN] {host} protegido por {remaining:.0f}s (emergency wake)')
-                    for host in idle_non_cooldown:
-                        print('desligando %s' %host)
+                    idle_ok = [h for h in idle if not is_in_wake_grace(h)]
+                    grace_hosts = [h for h in idle if is_in_wake_grace(h)]
+                    for h in grace_hosts:
+                        remaining = config.WAKE_GRACE_SECONDS - (time.time() - wake_times[h])
+                        print(f'[WAKE GRACE] {h} protegido por {remaining:.0f}s (wake recente)')
+                    for host in idle_ok:
+                        reason = ''
+                        ds = host_metrics.secs_since_delete(host)
+                        if ds < config.IDLE_DELETE_RECENCY_S:
+                            reason = f' (VMs deletadas há {ds:.0f}s — ocioso genuíno)'
+                        print('desligando %s%s' % (host, reason))
                         event_logger.logger.log(Event(
                             timestamp=datetime.now().isoformat(),
                             event_type='shutdown',
@@ -559,12 +555,19 @@ def run(lim_max, lim_med, predict_model):
                         ))
                         shutdown_host(host)		# shut down all idle hosts
                 else:								# Else...
-                    # Filter out hosts in cooldown
-                    idle_non_cooldown = [h for h in idle if not is_in_cooldown(h)]
-                    # Keep at least 1 host (either not in cooldown or the first one)
-                    shutdown_candidates = idle_non_cooldown[:-1] if len(idle_non_cooldown) > 1 else []
+                    idle_ok = [h for h in idle if not is_in_wake_grace(h)]
+                    grace_hosts = [h for h in idle if is_in_wake_grace(h)]
+                    for h in grace_hosts:
+                        remaining = config.WAKE_GRACE_SECONDS - (time.time() - wake_times[h])
+                        print(f'[WAKE GRACE] {h} protegido por {remaining:.0f}s (wake recente)')
+                    # Keep at least 1 host (either not in grace or the first one)
+                    shutdown_candidates = idle_ok[:-1] if len(idle_ok) > 1 else []
                     for host in shutdown_candidates:	# Turn off all except 1
-                        print('desligando %s' % host)
+                        reason = ''
+                        ds = host_metrics.secs_since_delete(host)
+                        if ds < config.IDLE_DELETE_RECENCY_S:
+                            reason = f' (VMs deletadas há {ds:.0f}s — ocioso genuíno)'
+                        print('desligando %s%s' % (host, reason))
                         event_logger.logger.log(Event(
                             timestamp=datetime.now().isoformat(),
                             event_type='shutdown',
