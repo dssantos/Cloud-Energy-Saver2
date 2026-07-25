@@ -377,16 +377,31 @@ def run(lim_max, lim_med, predict_model):
 
     running, idle, offline = classify_hosts(hosts, registered)
 
+    # Build hostname->data map for rich logging (ram + vms per host)
+    host_info = {h['hostname']: h for h in hosts}
+
     # ram_avg: decision metric (normal hosts only)
     # avg_actual: real load (all active hosts) -> logged to cluster CSV and events
     # avg_predicted: LSTM predictions mean (None when predict_model != 'lstm')
     ram_avg, overloaded, normal, avg_predicted, avg_actual = calculate_ram_average(hosts, lim_max, predict_model)
 
-    print('ativos: ' + str(running))
-    print('ociosos: ' + str(idle))
-    print('offline: ' + str(offline))
-    print(f'sobrecarregados: {overloaded}')
-    print(f'normais: {normal}')
+    def _fmt(host_list):
+        """Format host list with RAM and VM count for single-line logging."""
+        if not host_list:
+            return '[]'
+        parts = []
+        for h in host_list:
+            hi = host_info.get(h, {})
+            ram = hi.get('ram', 0)
+            vms = hi.get('vms', 0)
+            parts.append(f'{h}({ram:.0f}%/{vms}vm)')
+        return '[' + ' '.join(parts) + ']'
+
+    print(f'ativos:          {_fmt(running)}')
+    print(f'ociosos:         {_fmt(idle)}')
+    print(f'offline:         {_fmt(offline)}')
+    print(f'sobrecarregados: {_fmt(overloaded)}')
+    print(f'normais:         {_fmt(normal)}')
     print('média de ram (decisão): %s' % ram_avg)
     print(f'média real (avg_actual): {avg_actual:.1f}%')
 
@@ -495,9 +510,9 @@ def run(lim_max, lim_med, predict_model):
     # HIGH LOAD but cannot add capacity: keep idle hosts to absorb load (never shut down under high load)
     elif avg_actual > lim_max:
         if len(idle) > 0:
-            print(f'Carga alta ({avg_actual:.1f}%) com idle disponível para absorver — mantendo hosts idle.')
+            print(f'Carga alta ({avg_actual:.1f}%) — idle {_fmt(idle)} disponível para absorver.')
         else:
-            print(f'Carga alta ({avg_actual:.1f}%) sem hosts offline para acordar — limite de capacidade.')
+            print(f'Carga alta ({avg_actual:.1f}%) — sem idle/offline: {_fmt(running)} — limite de capacidade.')
     else:
         if len(idle) > 0:
             if ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
