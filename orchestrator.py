@@ -257,6 +257,15 @@ class ExperimentOrchestrator:
 		except:
 			print('   ! Nenhum host registrado para workload collection')
 
+		# Start multivariate workload collection (parallel pipeline -> workload_mv/{host}.csv)
+		try:
+			import workload_mv
+			for hostname in registered:
+				threading.Thread(target=workload_mv.save, args=[hostname], daemon=True).start()
+			print(f'   ✓ Multivariate workload collection iniciado ({len(registered)} hosts)')
+		except Exception as e:
+			print(f'   ! Erro ao iniciar multivariate workload: {e}')
+
 		# Initialize LSTM training for LSTM model
 		if self.predict_model == 'lstm':
 			try:
@@ -267,6 +276,15 @@ class ExperimentOrchestrator:
 				print(f'   ✓ LSTM training iniciado')
 			except Exception as e:
 				print(f'   ! Erro ao iniciar LSTM training: {e}')
+			# Multivariate pipeline: trains models_mv/{host}/ in parallel (evaluation only;
+			# the verifier still uses the univariate predict.lstm for decisions)
+			try:
+				import predict_mv
+				for hostname in registered:
+					predict_mv.mv_manager.start_training(hostname)
+				print(f'   ✓ Multivariate LSTM training iniciado ({len(registered)} hosts)')
+			except Exception as e:
+				print(f'   ! Erro ao iniciar multivariate LSTM training: {e}')
 
 		def verification_loop():
 			self.verification_active = True
@@ -308,7 +326,14 @@ class ExperimentOrchestrator:
 							for h in hosts:
 								if h.get('state') == 'up':
 									try:
-										p = predict.lstm(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
+										# Prefer multivariate model (more features)
+										try:
+											import predict_mv
+											p = predict_mv.lstm_mv(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
+											if p is None:
+												p = predict.lstm(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
+										except Exception:
+											p = predict.lstm(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
 										if p is not None:
 											preds.append(p)
 									except Exception:
@@ -320,6 +345,12 @@ class ExperimentOrchestrator:
 							hd = host_map.get(h, {})
 							per_host_vals.append(f"{hd.get('ram',0):.2f}" if hd.get('state')=='up' else '0.00')
 							per_host_vals.append(str(hd.get('vms',0)))
+							# Feed the multivariate pipeline with the current per-host VM count
+							try:
+								import host_metrics
+								host_metrics.set_vms(h, hd.get('vms', 0))
+							except Exception:
+								pass
 						writer.writerow([
 							datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
 							f'{ram_avg:.2f}', len(running), len(idle), len(offline),
