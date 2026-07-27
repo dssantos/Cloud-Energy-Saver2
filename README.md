@@ -91,41 +91,73 @@ cp .env.example .env
 
 ## Usage
 
-### Find and registry compute hosts
+The project has two entry points with distinct roles:
+
+- **`ces.py`** — lightweight manual utilities for inspecting/operating the environment (status, register, turn VMs on/off). Use for debugging and one-off operations.
+- **`orchestrator.py`** — full experiment runner (wake hosts + verification + VM load generation, predictive models, event logging, SLA tracking).
+
+### Manual utilities (`ces.py`)
+
+#### Find and register compute hosts
 ```bash
 python ces.py --registrator
-
 ```
 
-### Show current status of Compute nodes
+#### Show current status of Compute nodes (refreshes every 10s)
 ```bash
 python ces.py --status
-
 ```
 
-### Initialize VMs to create load on cloud environment
+#### Turn VMs on/off (manual load control)
 ```bash
-# auto on and off 30 VMs 
-python ces.py --instantiator 30
-
-# Only on 5 VMs
+# Start 5 VMs
 python ces.py --on 5
 
-# Only off 5 VMS
+# Shut down 5 VMs
 python ces.py --off 5
 ```
 
-### Start checking loads and manage hosts state
+---
+
+## Experiment Orchestrator
+
+The orchestrator (`orchestrator.py`) is the main entry point for running experiments. It manages a complete experiment end-to-end: wakes all hosts, waits for them to be ready, starts verification, and runs the VM instantiator in a loop. It also handles workload collection, background LSTM training, event logging, and SLA violation tracking.
+
+### Full experiment (wake + register + verify + instantiator)
 ```bash
-# Set threshold of loads to manage hosts
-python ces.py --verifier 70 30
+# Run with LSTM model, 70%/50% thresholds, 27 VMs
+python orchestrator.py --model lstm --lim-max 70 --lim-med 50 --num-vms 27
 
-# OR Manage hosts with arima predict model
-python ces.py --verifier 70 30 arima
-
-# OR Manage hosts with lstm predict model
-python ces.py --verifier 70 30 lstm
+# With a custom duration (default: 18 hours)
+python orchestrator.py --model lstm --lim-max 70 --lim-med 50 --num-vms 27 --duration 24
 ```
+
+### Modes (run only part of the pipeline)
+```bash
+# Only wake and register hosts, then stop
+python orchestrator.py --wake-only
+
+# Only run continuous verification (manage hosts on/off)
+python orchestrator.py --verify-only --model lstm --lim-max 70 --lim-med 50
+
+# Only create/delete VMs in a loop (load generation)
+python orchestrator.py --instantiator-only --num-vms 27
+```
+
+### Parameters
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--model` | `default` | Prediction model: `default`, `naive`, `arima`, `lstm` |
+| `--lim-max` | `70` | Maximum RAM threshold (%) — triggers waking hosts |
+| `--lim-med` | `30` | Medium RAM threshold (%) — triggers shutting down hosts |
+| `--num-vms` | `27` | Number of VMs to create/delete per cycle |
+| `--duration` | `18` | Experiment duration in hours |
+| `--config` | — | Optional JSON config file |
+| `--wake-only` | off | Wake and register hosts, then exit |
+| `--verify-only` | off | Run only continuous verification |
+| `--instantiator-only` | off | Run only VM create/delete loop |
+
+**Note:** With the `lstm` model, the orchestrator starts background training threads for all registered hosts and logs events to `events_lstm_<timestamp>.json`.
 
 **Prediction Models:**
 
@@ -133,3 +165,4 @@ python ces.py --verifier 70 30 lstm
 - **naive**: Uses last known workload value (if recent) or current RAM
 - **arima**: ARIMA(1,0,1) model fitted to workload history
 - **lstm**: LSTM neural network with continuous background training
+

@@ -116,22 +116,3 @@ def shutdown(host):
 	p = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True) # Runs command and store STDOUT
 	output = p.stdout.read()
 	print(output)
-
-
-def force_reset(host):
-	"""Força reset de um host travado via VBoxManage no host Windows (poweroff + start).
-	Usado quando um host sobrecarregado fica inacessível (down ou ram==0 com muitas VMs).
-	Chamar em background thread (bloqueia ~10-30s)."""
-	from subprocess import run, DEVNULL
-	if not WINDOWS_HOST or not WINDOWS_USER:
-		print(f'[RESET] {host}: WINDOWS_HOST/WINDOWS_USER não configurados, reset abortado.')
-		return
-	try:
-		print(f'[RESET] Forçando reset VBoxManage de {host} (poweroff + start)...')
-		cmd = (f'ssh -o ConnectTimeout=10 {WINDOWS_USER}@{WINDOWS_HOST} '
-		       f'"VBoxManage controlvm {host} poweroff 2>/dev/null; sleep 3; '
-		       f'VBoxManage startvm {host} --type=headless"')
-		run(cmd, shell=True, timeout=30, stdout=DEVNULL, stderr=DEVNULL)
-		print(f'[RESET] {host}: reset concluído.')
-	except Exception as e:
-		print(f'[RESET] {host} erro: {e}')

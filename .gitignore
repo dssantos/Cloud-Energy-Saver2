@@ -2,6 +2,7 @@
 !requirements.txt
 *.csv
 models/
+models_mv/
 .ces2/
 __pycache__/
 .vscode
