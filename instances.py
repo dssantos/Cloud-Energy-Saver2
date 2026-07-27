@@ -104,7 +104,7 @@ def _refresh_vm_list():
 	"""Refresh the VM list from OpenStack."""
 	global length, vm_list
 	try:
-		r = requests.get('http://controller:8774/v2.1/servers', headers=header.get())
+		r = requests.get('http://controller:8774/v2.1/servers', headers=header.get(), timeout=10)
 	except requests.exceptions.ConnectionError as e:
 		raise requests.exceptions.ConnectionError(f"{e}: This computer does not have communication with the Controller.\nCheck the requirements in https://github.com/dssantos/Cloud-Energy-Saver2")
 
@@ -158,7 +158,7 @@ def create_instance_with_sla_check(vm_name):
 			# Try to get server ID from API by name
 			print(f'[SLA] Could not extract server ID from output, querying API...')
 			time.sleep(5)  # Wait for server to appear in API
-			r = requests.get('http://controller:8774/v2.1/servers', headers=header.get())
+			r = requests.get('http://controller:8774/v2.1/servers', headers=header.get(), timeout=10)
 			servers = json.loads(r.content).get('servers', [])
 			for server in servers:
 				if server['name'] == vm_name:
