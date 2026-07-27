@@ -224,20 +224,103 @@ class ExperimentOrchestrator:
 		finally:
 			self.save_final_status()
 
-	def start_verification(self):
-		"""Start verification loop in background thread."""
-		print('\n[4/6] Iniciando verificação em background...')
-		import threading
-		import event_logger
-		from datetime import datetime
+	def _read_registered(self):
+		"""Lê registered.txt e retorna a lista de hostnames (ou [] em erro)."""
+		try:
+			with open("registered.txt", "r") as f:
+				return ast.literal_eval(f.read())
+		except Exception:
+			return []
 
-		# Initialize event logger with model-specific filename (ts shared with cluster CSV)
-		ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+	def _start_cluster_logging(self, ts):
+		"""Inicia o logger de cluster_workload CSV + event_logger em background.
+		Reutilizado pelo baseline (sem verifier) e pelo start_verification().
+		Retorna o nome do arquivo CSV gerado."""
+		import threading, csv
+		from datetime import datetime
+		import event_logger
+
 		event_file = f'events_{self.predict_model}_{ts}.json'
 		cluster_file = f'cluster_workload_{self.predict_model}_{ts}.csv'
 		event_logger.logger = event_logger.EventLogger(event_file)
 		print(f'   Event logging: {event_file}')
 		print(f'   Cluster workload logging: {cluster_file}')
+
+		lg = self._read_registered()
+
+		def _loop():
+			import csv, config, predict
+			with open(cluster_file, 'w', newline='') as cf:
+				writer = csv.writer(cf)
+				per_host_cols = []
+				for h in lg:
+					per_host_cols.append(f'ram_{h}')
+					per_host_cols.append(f'vms_{h}')
+				writer.writerow(['time_stamp', 'ram_avg', 'running_hosts', 'idle_hosts',
+				                 'offline_hosts', 'predicted_ram'] + per_host_cols)
+				while not self.cancelled:
+					try:
+						hosts = status.get()
+						running, idle, offline = verifier.classify_hosts(hosts, lg)
+						up_rams = [h['ram'] for h in hosts if h.get('state') == 'up']
+						ram_avg = sum(up_rams) / len(up_rams) if up_rams else 0.0
+						predicted = None
+						if self.predict_model == 'lstm':
+							preds = []
+							for h in hosts:
+								if h.get('state') == 'up':
+									try:
+										try:
+											import predict_mv
+											p = predict_mv.lstm_mv(hostname=h['hostname'],
+											                       steps_ahead=config.STEPS_AHEAD)
+											if p is None:
+												p = predict.lstm(hostname=h['hostname'],
+												                 steps_ahead=config.STEPS_AHEAD)
+										except Exception:
+											p = predict.lstm(hostname=h['hostname'],
+											                 steps_ahead=config.STEPS_AHEAD)
+										if p is not None:
+											preds.append(p)
+									except Exception:
+										pass
+							predicted = sum(preds) / len(preds) if preds else None
+						per_host_vals = []
+						host_map = {h['hostname']: h for h in hosts}
+						for h in lg:
+							hd = host_map.get(h, {})
+							per_host_vals.append(f"{hd.get('ram',0):.2f}" if hd.get('state') == 'up' else '0.00')
+							per_host_vals.append(str(hd.get('vms', 0)))
+							try:
+								import host_metrics
+								host_metrics.set_vms(h, hd.get('vms', 0))
+							except Exception:
+								pass
+						writer.writerow([
+							datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+							f'{ram_avg:.2f}', len(running), len(idle), len(offline),
+							f'{predicted:.2f}' if predicted is not None else ''
+						] + per_host_vals)
+						cf.flush()
+					except Exception as e:
+						print(f'[Cluster Logger Error] {e}')
+					time.sleep(config.CLUSTER_SAMPLE_INTERVAL_S)
+
+		threading.Thread(target=_loop, daemon=True).start()
+		print('   ✓ Cluster workload logger iniciado em background')
+		return cluster_file
+
+	def start_verification(self):
+		"""Start verification loop in background thread."""
+		print('\n[4/6] Iniciando verificação em background...')
+		import threading
+		from datetime import datetime
+
+		ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+		registered = self._read_registered()
+
+		# Inicializa event_logger + cluster_workload CSV (método extraído e reutilizado)
+		self._start_cluster_logging(ts)
 
 		# Log initial host state (also sets verifier.experiment_start_time for final_state)
 		try:
@@ -247,9 +330,6 @@ class ExperimentOrchestrator:
 
 		# Start workload collection for registered hosts
 		try:
-			with open("registered.txt", "r") as file:
-				import ast
-				registered = ast.literal_eval(file.read())
 			print(f'   Iniciando workload collection para {len(registered)} hosts...')
 			for hostname in registered:
 				import workload
@@ -299,70 +379,7 @@ class ExperimentOrchestrator:
 		thread.start()
 		print('   ✓ Verifier iniciado em background')
 
-		# Cluster workload logger: samples real load + LSTM prediction into cluster_workload_*.csv
-		def cluster_workload_loop():
-			import csv, config, predict
-			try:
-				with open("registered.txt", "r") as rf:
-					lg = ast.literal_eval(rf.read())
-			except Exception:
-				lg = []
-			with open(cluster_file, 'w', newline='') as cf:
-				writer = csv.writer(cf)
-				per_host_cols = []
-				for h in lg:
-					per_host_cols.append(f'ram_{h}')
-					per_host_cols.append(f'vms_{h}')
-				writer.writerow(['time_stamp', 'ram_avg', 'running_hosts', 'idle_hosts', 'offline_hosts', 'predicted_ram'] + per_host_cols)
-				while self.verification_active and not self.cancelled:
-					try:
-						hosts = status.get()
-						running, idle, offline = verifier.classify_hosts(hosts, lg)
-						up_rams = [h['ram'] for h in hosts if h.get('state') == 'up']
-						ram_avg = sum(up_rams) / len(up_rams) if up_rams else 0.0
-						predicted = None
-						if self.predict_model == 'lstm':
-							preds = []
-							for h in hosts:
-								if h.get('state') == 'up':
-									try:
-										# Prefer multivariate model (more features)
-										try:
-											import predict_mv
-											p = predict_mv.lstm_mv(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
-											if p is None:
-												p = predict.lstm(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
-										except Exception:
-											p = predict.lstm(hostname=h['hostname'], steps_ahead=config.STEPS_AHEAD)
-										if p is not None:
-											preds.append(p)
-									except Exception:
-										pass
-							predicted = sum(preds) / len(preds) if preds else None
-						per_host_vals = []
-						host_map = {h['hostname']: h for h in hosts}
-						for h in lg:
-							hd = host_map.get(h, {})
-							per_host_vals.append(f"{hd.get('ram',0):.2f}" if hd.get('state')=='up' else '0.00')
-							per_host_vals.append(str(hd.get('vms',0)))
-							# Feed the multivariate pipeline with the current per-host VM count
-							try:
-								import host_metrics
-								host_metrics.set_vms(h, hd.get('vms', 0))
-							except Exception:
-								pass
-						writer.writerow([
-							datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-							f'{ram_avg:.2f}', len(running), len(idle), len(offline),
-							f'{predicted:.2f}' if predicted is not None else ''
-						] + per_host_vals)
-						cf.flush()
-					except Exception as e:
-						print(f'[Cluster Logger Error] {e}')
-					time.sleep(config.CLUSTER_SAMPLE_INTERVAL_S)
 
-		threading.Thread(target=cluster_workload_loop, daemon=True).start()
-		print('   ✓ Cluster workload logger iniciado em background')
 
 	def _duration_expired(self):
 		"""True quando --duration expirou; seta cancelled p/ parada graciosa (save_final_status)."""
@@ -491,10 +508,11 @@ class ExperimentOrchestrator:
 		"""Save final experiment status."""
 		print('\n\n[FINAL] Salvando status final...')
 
-		# Log final host state and stop LSTM training (meaningful only after a verification run)
+		# Log final host state and stop LSTM training (meaningful only after a verification run;
+		# no-op in baseline mode since verifier was never started).
 		try:
 			verifier.log_final_state()
-		except Exception as e:
+		except (AttributeError, Exception) as e:
 			print(f'   ! Erro ao logar estado final: {e}')
 		try:
 			if self.predict_model == 'lstm':
@@ -525,6 +543,32 @@ class ExperimentOrchestrator:
 	def run(self):
 		"""Execute complete experiment."""
 		self.results['start_time'] = datetime.now().isoformat()
+
+		# Baseline mode: wake all hosts, NO verifier, just instantiator with all hosts on.
+		# Collects cluster_workload CSV for energy/SLA comparison.
+		if self.predict_model == 'baseline':
+			print('\n=== Modo Baseline: hosts sempre ligados, sem verificador ===')
+			try:
+				self.wake_all_hosts()
+				if not self.cancelled:
+					self.wait_hosts_ready()
+				if not self.cancelled:
+					self.register_hosts()
+				if not self.cancelled:
+					from datetime import datetime
+					ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+					self._start_cluster_logging(ts)
+				if not self.cancelled:
+					self.start_instantiator()
+				if not self.cancelled:
+					self.monitor_progress()
+			except Exception as e:
+				print(f'\n✗ Erro: {e}')
+				import traceback
+				traceback.print_exc()
+			finally:
+				self.save_final_status()
+			return
 
 		# Instantiator-only mode: Skip wake, register, verification
 		if self.instantiator_only:
@@ -568,7 +612,7 @@ def main():
 	parser = argparse.ArgumentParser(description='CES Experiment Orchestrator')
 	parser.add_argument('--lim-max', type=float, default=70, help='Limite máximo de RAM (%)')
 	parser.add_argument('--lim-med', type=float, default=30, help='Limite médio de RAM (%)')
-	parser.add_argument('--model', default='default', choices=['default', 'naive', 'arima', 'lstm'])
+	parser.add_argument('--model', default='default', choices=['default', 'naive', 'arima', 'lstm', 'baseline'])
 	parser.add_argument('--num-vms', type=int, default=27, help='Número de VMs para instanciar')
 	parser.add_argument('--duration', type=int, default=18, help='Duração do experimento (horas)')
 	parser.add_argument('--config', help='Arquivo de configuração JSON')

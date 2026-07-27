@@ -17,7 +17,7 @@ cd /home/danilo/dev/python/Cloud-Energy-Saver2
 PY=.venv/bin/python
 
 DUR_HOURS="${DUR_HOURS:-6}"
-MODELS="${MODELS:-default lstm default lstm}"
+MODELS="${MODELS:-baseline default lstm}"
 NUM_VMS="${NUM_VMS:-27}"
 LIM_MAX="${LIM_MAX:-70}"
 LIM_MED="${LIM_MED:-50}"
@@ -74,20 +74,20 @@ for MODEL in $MODELS; do
 done
 
 echo ""
-echo "=== ANALYZE (par mais recente de cada modo) $(date) ==="
+echo "=== ANALYZE (3-way: baseline vs default vs lstm) $(date) ==="
+BEvents=$(ls -t events_baseline_*.json 2>/dev/null | head -1)
+BCsv=$(ls -t cluster_workload_baseline_*.csv 2>/dev/null | head -1)
 REvents=$(ls -t events_default_*.json 2>/dev/null | head -1)
 RCsv=$(ls -t cluster_workload_default_*.csv 2>/dev/null | head -1)
 LEvents=$(ls -t events_lstm_*.json 2>/dev/null | head -1)
 LCsv=$(ls -t cluster_workload_lstm_*.csv 2>/dev/null | head -1)
+echo "baseline: $BEvents  /  $BCsv"
 echo "reactive: $REvents  /  $RCsv"
 echo "lstm    : $LEvents  /  $LCsv"
 echo ""
-echo "Arquivos disponíveis para pares alternativos (análise manual):"
-echo "  default: $(ls -t events_default_*.json 2>/dev/null | tr '\n' ' ')"
-echo "  lstm   : $(ls -t events_lstm_*.json 2>/dev/null | tr '\n' ' ')"
-echo ""
-if [[ -n "$REvents" && -n "$RCsv" && -n "$LEvents" && -n "$LCsv" ]]; then
+if [[ -n "$BEvents" && -n "$BCsv" && -n "$REvents" && -n "$RCsv" && -n "$LEvents" && -n "$LCsv" ]]; then
   $PY analyze_metrics.py \
+    --baseline-events "$BEvents" --baseline-csv "$BCsv" \
     --reactive-events "$REvents" --reactive-csv "$RCsv" \
     --lstm-events "$LEvents" --lstm-csv "$LCsv" \
     --lim-max "$LIM_MAX" --lim-med "$LIM_MED" 2>&1 | grep -v "absl\|cuda\|cudart\|InitializeLog"

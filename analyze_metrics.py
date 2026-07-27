@@ -12,12 +12,13 @@ antecipação, atraso, ativações desnecessárias, tempo ativo, SLA e economia.
 
 Uso:
   python analyze_metrics.py \
-      --reactive-events events_default_<ts1>.json --reactive-csv cluster_workload_default_<ts1>.csv \
-      --lstm-events events_lstm_<ts2>.json        --lstm-csv cluster_workload_lstm_<ts2>.csv
+      --baseline-events events_baseline_<ts>.json --baseline-csv cluster_workload_baseline_<ts>.csv \
+      --reactive-events events_default_<ts>.json  --reactive-csv cluster_workload_default_<ts>.csv \
+      --lstm-events events_lstm_<ts>.json         --lstm-csv cluster_workload_lstm_<ts>.csv
 
 Saídas:
-  - analysis_<ts1>__vs__<ts2>.json  (máquina)
-  - TCC_METRICS_<ts>.md             (humano)
+  - analysis_<ts1>__vs__<ts2>__vs__<ts3>.json  (máquina)
+  - TCC_METRICS_<ts>.md                         (humano)
 """
 
 import argparse
@@ -63,21 +64,23 @@ def csv_duration_hours(csv_df):
 # Window alignment
 # ---------------------------------------------------------------------------
 
-def align_windows(events_r, csv_r, events_l, csv_l):
+def align_windows(csv_b, csv_r, csv_l):
     """
-    Truncate both experiments to the shorter duration T_min so they are
+    Truncate all three experiments to the shortest duration so they are
     comparable. Each experiment is truncated from its own start.
     Returns dict with duration_hours and per-experiment start timestamps.
     """
-    dur_r = csv_duration_hours(csv_r)
-    dur_l = csv_duration_hours(csv_l)
-    t_min = min(dur_r, dur_l)
-    start_r = csv_r.index.min() if not csv_r.empty else None
-    start_l = csv_l.index.min() if not csv_l.empty else None
+    durs = []
+    for name, csv_df in [('baseline', csv_b), ('reactive', csv_r), ('lstm', csv_l)]:
+        d = csv_duration_hours(csv_df)
+        if d > 0:
+            durs.append(d)
+    t_min = min(durs) if durs else 0.0
     return {
         'duration_hours': t_min,
-        'start_reactive': str(start_r) if start_r is not None else None,
-        'start_lstm': str(start_l) if start_l is not None else None,
+        'start_baseline': str(csv_b.index.min()) if not csv_b.empty else None,
+        'start_reactive': str(csv_r.index.min()) if not csv_r.empty else None,
+        'start_lstm': str(csv_l.index.min()) if not csv_l.empty else None,
     }
 
 
@@ -274,24 +277,44 @@ def sla_episodes(events, csv_df, duration_h):
                 if e['event_type'] == 'sla_violation' and e.get('hostname') is not None])
 
 
-def energy_economy(hours_r, hours_l, p):
+def total_active_hours_baseline(duration_h):
     """
-    Energy saved by LSTM vs reactive, using average host power.
-      reactive_kwh = hours_r * P_AVG / 1000
-      lstm_kwh     = hours_l  * P_AVG / 1000
+    Baseline: all N_HOSTS are always on (no verifier, no shutdown).
+    Simply N_HOSTS × duration_hours.
     """
-    reactive_kwh = hours_r * p.P_AVG / 1000.0
-    lstm_kwh = hours_l * p.P_AVG / 1000.0
-    saved = reactive_kwh - lstm_kwh
-    pct = (saved / reactive_kwh * 100.0) if reactive_kwh > 0 else 0.0
-    return {'kwh': round(saved, 4), 'pct': round(pct, 2)}
+    return config.N_HOSTS * duration_h
+
+
+def energy_economy_3way(baseline_h, default_h, lstm_h, p):
+    """
+    Energy comparison with baseline as 100% (all hosts always on).
+    Returns dict with baseline_kwh, default_kwh, lstm_kwh, and savings %.
+    """
+    baseline_kwh = baseline_h * p.P_AVG / 1000.0
+    default_kwh = default_h * p.P_AVG / 1000.0
+    lstm_kwh = lstm_h * p.P_AVG / 1000.0
+    return {
+        'baseline_kwh': round(baseline_kwh, 4),
+        'default_kwh': round(default_kwh, 4),
+        'lstm_kwh': round(lstm_kwh, 4),
+        'default_saved_pct': round((baseline_kwh - default_kwh) / baseline_kwh * 100.0, 2) if baseline_kwh > 0 else 0.0,
+        'lstm_saved_pct': round((baseline_kwh - lstm_kwh) / baseline_kwh * 100.0, 2) if baseline_kwh > 0 else 0.0,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
-def analyze_scenario(events, csv_df, lim_max, lim_med, duration_h):
+def analyze_scenario(events, csv_df, lim_max, lim_med, duration_h, baseline=False):
+    if baseline:
+        return {
+            'unnecessary_pct': 0.0,
+            'late_shutdown_min': 0.0,
+            'anticipation_min': 0.0,
+            'active_hours': round(total_active_hours_baseline(duration_h), 3),
+            'sla_episodes': 0,
+        }
     return {
         'unnecessary_pct': round(unnecessary_activations(events, csv_df, lim_max, duration_h), 2),
         'late_shutdown_min': round(late_shutdown_time(events, csv_df, lim_med, duration_h), 2),
@@ -308,45 +331,46 @@ def extract_ts(filename, prefix=None):
     return m.group(1) if m else 'unknown'
 
 
-def build_report(window, r, l, lim_max, lim_med):
+def build_report(window, b, r, l, lim_max, lim_med):
     lines = []
-    lines.append('# Relatório de Métricas — CES2 (Reativo vs LSTM)\n')
-    lines.append(f"- Janela alinhada: **{window['duration_hours']:.2f} h** "
-                 f"(início reativo: {window['start_reactive']} | início LSTM: {window['start_lstm']})")
+    lines.append('# Relatório de Métricas — CES2 (Baseline vs Default vs LSTM)\n')
+    lines.append(f"- Janela alinhada: **{window['duration_hours']:.2f} h**")
+    lines.append(f"  - Baseline: {window['start_baseline']}")
+    lines.append(f"  - Default:  {window['start_reactive']}")
+    lines.append(f"  - LSTM:     {window['start_lstm']}")
     lines.append(f"- Limiares: lim_max={lim_max}% | lim_med={lim_med}%")
-    lines.append(f"- Potência: P_IDLE={config.P_IDLE}W | P_LOAD={config.P_LOAD}W | P_AVG={config.P_AVG}W\n")
+    lines.append(f"- Potência: P_IDLE={config.P_IDLE}W | P_LOAD={config.P_LOAD}W | P_AVG={config.P_AVG}W")
+    lines.append(f"- Hosts: {config.N_HOSTS}\n")
 
-    lines.append('| Métrica | Reativo (default) | LSTM |')
-    lines.append('|---|---|---|')
-    lines.append(f"| Ativações desnecessárias (%) | {r['unnecessary_pct']:.1f} | {l['unnecessary_pct']:.1f} |")
-    lines.append(f"| Atraso de shutdown (min) | {r['late_shutdown_min']:.2f} | {l['late_shutdown_min']:.2f} |")
-    lines.append(f"| Antecipação (min) | {r['anticipation_min']:.2f} | {l['anticipation_min']:.2f} |")
-    lines.append(f"| Horas ativas (host·h) | {r['active_hours']:.2f} | {l['active_hours']:.2f} |")
-    lines.append(f"| Episódios SLA | {r['sla_episodes']} | {l['sla_episodes']} |")
+    lines.append('| Métrica | Baseline | Default | LSTM |')
+    lines.append('|---|---|---|---|')
+    lines.append(f"| Ativações desnecessárias (%) | {b['unnecessary_pct']:.1f} | {r['unnecessary_pct']:.1f} | {l['unnecessary_pct']:.1f} |")
+    lines.append(f"| Atraso de shutdown (min) | {b['late_shutdown_min']:.2f} | {r['late_shutdown_min']:.2f} | {l['late_shutdown_min']:.2f} |")
+    lines.append(f"| Antecipação (min) | {b['anticipation_min']:.2f} | {r['anticipation_min']:.2f} | {l['anticipation_min']:.2f} |")
+    lines.append(f"| Horas ativas (host·h) | {b['active_hours']:.2f} | {r['active_hours']:.2f} | {l['active_hours']:.2f} |")
+    lines.append(f"| Episódios SLA | {b['sla_episodes']} | {r['sla_episodes']} | {l['sla_episodes']} |")
     lines.append('')
 
-    reduction = (((r['active_hours'] - l['active_hours']) / r['active_hours'] * 100.0)
-                 if r['active_hours'] > 0 else 0.0)
-    energy = energy_economy(r['active_hours'], l['active_hours'], config)
-    lines.append('## Economia de energia')
-    lines.append(f"- Redução de horas ativas: **{reduction:.1f}%**")
-    lines.append(f"- Energia economizada: **{energy['kwh']} kWh** ({energy['pct']:.1f}%)")
+    energy = energy_economy_3way(b['active_hours'], r['active_hours'], l['active_hours'], config)
+    lines.append('## Economia de energia (referência: baseline = 100%)')
+    lines.append(f"- Baseline (todos hosts ligados): **{energy['baseline_kwh']} kWh**")
+    lines.append(f"- Default: **{energy['default_kwh']} kWh** ({energy['default_saved_pct']:.1f}% economizado vs baseline)")
+    lines.append(f"- LSTM:    **{energy['lstm_kwh']} kWh** ({energy['lstm_saved_pct']:.1f}% economizado vs baseline)")
     lines.append('')
     lines.append('## Interpretação')
+    lines.append('- **Baseline**: todos os hosts sempre ligados, sem verificador. Referência de consumo máximo e SLA zero.')
     lines.append('- **Antecipação (LSTM)**: média de quão cedo o wake preditivo ocorreu antes '
-                 'do cruzamento real de lim_max. Valor > 0 indica que o LSTM acordou hosts com antecedência.')
-    lines.append('- **Atraso de shutdown**: quanto tempo após a carga cair abaixo de lim_med o host foi desligado. '
-                 'Menor = melhor consolidação.')
+                 'do cruzamento real de lim_max.')
+    lines.append('- **Atraso de shutdown**: quanto tempo após a carga cair abaixo de lim_med o host foi desligado.')
     lines.append('- **Ativações desnecessárias**: % de wakes sem pico de carga acima de lim_max na janela de '
-                 f'{config.VALIDATION_WINDOW_MIN} min. *Caveat:* um wake adiciona um host novo (RAM baixa) que '
-                 'dilui a média, podendo mascarar wakes necessários.')
-    lines.append('- **Episódios SLA evitáveis**: violações com hosts offline disponíveis (offline>0); '
-                 'limite de capacidade (offline==0) não conta contra o modelo.')
+                 f'{config.VALIDATION_WINDOW_MIN} min.')
     return '\n'.join(lines) + '\n'
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Análise de métricas CES2 (reativo vs LSTM)')
+    parser = argparse.ArgumentParser(description='Análise de métricas CES2 (3-way: baseline vs default vs lstm)')
+    parser.add_argument('--baseline-events', required=True)
+    parser.add_argument('--baseline-csv', required=True)
     parser.add_argument('--reactive-events', required=True)
     parser.add_argument('--reactive-csv', required=True)
     parser.add_argument('--lstm-events', required=True)
@@ -355,47 +379,54 @@ def main():
     parser.add_argument('--lim-med', type=float, default=config.LIM_MED)
     args = parser.parse_args()
 
+    events_b = load_events(args.baseline_events)
+    csv_b = load_cluster_csv(args.baseline_csv)
     events_r = load_events(args.reactive_events)
     csv_r = load_cluster_csv(args.reactive_csv)
     events_l = load_events(args.lstm_events)
     csv_l = load_cluster_csv(args.lstm_csv)
 
-    window = align_windows(events_r, csv_r, events_l, csv_l)
+    window = align_windows(csv_b, csv_r, csv_l)
     dur = window['duration_hours']
 
+    b = analyze_scenario(events_b, csv_b, args.lim_max, args.lim_med, dur, baseline=True)
     r = analyze_scenario(events_r, csv_r, args.lim_max, args.lim_med, dur)
     l = analyze_scenario(events_l, csv_l, args.lim_max, args.lim_med, dur)
 
-    energy = energy_economy(r['active_hours'], l['active_hours'], config)
-    reduction = (((r['active_hours'] - l['active_hours']) / r['active_hours'] * 100.0)
-                 if r['active_hours'] > 0 else 0.0)
+    energy = energy_economy_3way(b['active_hours'], r['active_hours'], l['active_hours'], config)
 
+    b_ts = extract_ts(args.baseline_events, 'events')
     r_ts = extract_ts(args.reactive_events, 'events')
     l_ts = extract_ts(args.lstm_events, 'events')
 
     result = {
-        'window': {'start': window['start_reactive'], 'duration_hours': round(dur, 3)},
+        'window': {'start': window['start_baseline'], 'duration_hours': round(dur, 3)},
+        'unnecessary_baseline': b['unnecessary_pct'],
         'unnecessary_reactive': r['unnecessary_pct'],
         'unnecessary_lstm': l['unnecessary_pct'],
         'late_shutdown_reactive_min': r['late_shutdown_min'],
         'late_shutdown_lstm_min': l['late_shutdown_min'],
         'anticipation_reactive_min': r['anticipation_min'],
         'anticipation_lstm_min': l['anticipation_min'],
-        'baseline_hours': r['active_hours'],
+        'baseline_hours': b['active_hours'],
+        'reactive_hours': r['active_hours'],
         'lstm_active_hours': l['active_hours'],
-        'reduction_pct': round(reduction, 2),
-        'energy_kwh': energy['kwh'],
-        'energy_pct': energy['pct'],
+        'default_saved_pct': energy['default_saved_pct'],
+        'lstm_saved_pct': energy['lstm_saved_pct'],
+        'energy_kwh_baseline': energy['baseline_kwh'],
+        'energy_kwh_default': energy['default_kwh'],
+        'energy_kwh_lstm': energy['lstm_kwh'],
+        'sla_episodes_baseline': b['sla_episodes'],
         'sla_episodes_reactive': r['sla_episodes'],
         'sla_episodes_lstm': l['sla_episodes'],
     }
 
-    json_out = f'analysis_{r_ts}__vs__{l_ts}.json'
+    json_out = f'analysis_{b_ts}__vs__{r_ts}__vs__{l_ts}.json'
     with open(json_out, 'w') as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
     print(f'✓ JSON: {json_out}')
 
-    report = build_report(window, r, l, args.lim_max, args.lim_med)
+    report = build_report(window, b, r, l, args.lim_max, args.lim_med)
     from datetime import datetime
     md_out = f'TCC_METRICS_{datetime.now().strftime("%Y%m%d_%H%M%S")}.md'
     with open(md_out, 'w') as f:
