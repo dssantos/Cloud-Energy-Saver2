@@ -555,7 +555,6 @@ class ExperimentOrchestrator:
 				if not self.cancelled:
 					self.register_hosts()
 				if not self.cancelled:
-					from datetime import datetime
 					ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 					self._start_cluster_logging(ts)
 				if not self.cancelled:
