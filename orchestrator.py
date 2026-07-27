@@ -558,6 +558,11 @@ class ExperimentOrchestrator:
 					ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 					self._start_cluster_logging(ts)
 				if not self.cancelled:
+					try:
+						verifier.log_initial_state()
+					except Exception:
+						pass
+				if not self.cancelled:
 					self.start_instantiator()
 				if not self.cancelled:
 					self.monitor_progress()
