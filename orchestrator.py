@@ -614,7 +614,7 @@ def main():
 	parser.add_argument('--lim-med', type=float, default=30, help='Limite médio de RAM (%)')
 	parser.add_argument('--model', default='default', choices=['default', 'naive', 'arima', 'lstm', 'baseline'])
 	parser.add_argument('--num-vms', type=int, default=27, help='Número de VMs para instanciar')
-	parser.add_argument('--duration', type=int, default=18, help='Duração do experimento (horas)')
+	parser.add_argument('--duration', type=float, default=18, help='Duração do experimento (horas)')
 	parser.add_argument('--config', help='Arquivo de configuração JSON')
 	parser.add_argument('--wake-only', action='store_true', help='Executar apenas wake dos hosts')
 	parser.add_argument('--verify-only', action='store_true', help='Executar apenas verificação contínua')
