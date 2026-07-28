@@ -21,8 +21,8 @@ MODELS="${MODELS:-baseline default lstm}"
 NUM_VMS="${NUM_VMS:-27}"
 LIM_MAX="${LIM_MAX:-70}"
 LIM_MED="${LIM_MED:-50}"
-DUR_S=$(( DUR_HOURS * 3600 ))
-SAFETY_S=$(( DUR_S + 900 ))   # 15 min de folga sobre --duration
+DUR_S=$($PY -c "print(int($DUR_HOURS * 3600))")
+SAFETY_S=$($PY -c "print(int($DUR_S + 900))")   # 15 min de folga sobre --duration
 
 # Timestamped log filename + symlink para convenience (tail -f experiment_run.log funciona)
 TS=$(date +%Y%m%d_%H%M%S)
