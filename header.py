@@ -47,7 +47,7 @@ def get():
         header = file.read()
         header = json.loads(header.replace('\'', '\"'))
     else: # generate new token 
-        r = requests.post('http://controller:5000/v3/auth/tokens', data=body, headers=headers)
+        r = requests.post('http://controller:5000/v3/auth/tokens', data=body, headers=headers, timeout=10)
         token = r.headers['X-Subject-Token']
         header = {'X-Auth-Token':token}  # Token string
         file = open("token.txt", "w+")
