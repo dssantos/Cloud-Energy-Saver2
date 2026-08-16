@@ -614,8 +614,8 @@ class ExperimentOrchestrator:
 
 def main():
 	parser = argparse.ArgumentParser(description='CES Experiment Orchestrator')
-	parser.add_argument('--lim-max', type=float, default=70, help='Limite máximo de RAM (%)')
-	parser.add_argument('--lim-med', type=float, default=30, help='Limite médio de RAM (%)')
+	parser.add_argument('--lim-max', type=float, default=70, help='Limite máximo de RAM (%%)')
+	parser.add_argument('--lim-med', type=float, default=30, help='Limite médio de RAM (%%)')
 	parser.add_argument('--model', default='default', choices=['default', 'naive', 'arima', 'lstm', 'baseline'])
 	parser.add_argument('--num-vms', type=int, default=27, help='Número de VMs para instanciar')
 	parser.add_argument('--duration', type=float, default=18, help='Duração do experimento (horas)')
