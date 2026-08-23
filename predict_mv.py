@@ -29,7 +29,7 @@ _stderr = io.StringIO()
 with redirect_stderr(_stderr):
     from random import choice
     from time import sleep
-    from numpy import array, concatenate, where, exp, log1p, clip
+    from numpy import array, concatenate, where, exp, log1p, clip, sqrt, mean
     from keras.models import Sequential, load_model
     from keras.layers import LSTM, Dense, Dropout
     from keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -43,7 +43,7 @@ MODEL_DIR = 'models_mv'
 RAW_COLS = ['mem', 'vms', 'secs_since_vm_created', 'secs_since_vm_deleted', 'swap', 'loadavg']
 
 # Derived feature columns (after _engineer)
-FEATURES = ['mem', 'vms', 'rec_create', 'rec_delete', 'loadavg']
+FEATURES = ['mem', 'vms', 'rec_create', 'rec_delete', 'loadavg', 'mem_ma', 'mem_diff']
 
 TARGET = 'mem'
 TRAIN_INTERVAL_S = 600  # retrain every 10 min
@@ -64,23 +64,34 @@ def _engineer(df):
       happened, ~0=long ago; sentinel 9999 → 0).
     - loadavg: log1p with clipping to tame overload-spike outliers (82→92
       would otherwise wreck MinMax).
+    - mem_ma: 2-step moving average of mem (short-term level).
+    - mem_diff: 1-step first difference of mem (momentum/trend).
     """
     out = pd.DataFrame(index=df.index)
-    out['mem'] = df['mem'].astype('float64')
+    mem = df['mem'].astype('float64')
+    out['mem'] = mem
     out['vms'] = df['vms'].astype('float64')
     cre = df['secs_since_vm_created'].astype('float64').values
     dele = df['secs_since_vm_deleted'].astype('float64').values
     out['rec_create'] = where(cre >= 9998, 0.0, exp(-cre / RECENCY_DECAY_S))
     out['rec_delete'] = where(dele >= 9998, 0.0, exp(-dele / RECENCY_DECAY_S))
     out['loadavg'] = log1p(clip(df['loadavg'].astype('float64').values, 0, LOADAVG_CLIP))
+    out['mem_ma'] = mem.rolling(window=2).mean()
+    out['mem_diff'] = mem.diff(1)
     return out
 
 
 def _hp():
-    """Random hyperparameters (same search space as the univariate model)."""
+    """Random hyperparameters (extended with stacked-LSTM support).
+
+    num_layers/lstm_units2 come from the generic_predictor search space; a
+    num_layers=1 draw reproduces the previous single-layer architecture.
+    """
     return {
         'n_steps': choice([10, 15, 20, 30, 50]),
         'lstm_units': choice([64, 128, 256]),
+        'lstm_units2': choice([64, 128, 256]),
+        'num_layers': choice([1, 2]),
         'epochs': choice([100, 200, 300]),
         'batch_size': choice([8, 16, 32, 64]),
         'dropout': choice([0.1, 0.2, 0.5]),
@@ -111,13 +122,6 @@ def _scale(arr2d, mn, mx):
     return (arr2d - mn) / (mx - mn)
 
 
-def _loss_to_str(val_loss):
-    """Format a float loss into the zero-padded filename prefix (e.g. 000.012345)."""
-    s = str(val_loss)
-    head, _, tail = s.partition('.')
-    return '.'.join([head.zfill(3), tail[:6]])
-
-
 def train_lstm_model_mv(hostname, steps_ahead=2):
     """Train one multivariate LSTM (delta target) for a host and save it."""
     os.makedirs(f'{MODEL_DIR}/{hostname}', exist_ok=True)
@@ -134,6 +138,8 @@ def train_lstm_model_mv(hostname, steps_ahead=2):
         hp = _hp()
         n_steps = hp['n_steps']
         units = hp['lstm_units']
+        units2 = hp['lstm_units2']
+        num_layers = hp['num_layers']
         epochs = hp['epochs']
         batch = hp['batch_size']
         dropout = hp['dropout']
@@ -178,8 +184,15 @@ def train_lstm_model_mv(hostname, steps_ahead=2):
         Xval, yval = _to_delta(va_X, va_now, va_fut)
 
         model = Sequential()
-        model.add(LSTM(units, activation='relu', input_shape=(n_steps, len(FEATURES))))
-        model.add(Dropout(dropout))
+        if num_layers == 2:
+            model.add(LSTM(units, activation='relu', return_sequences=True,
+                           input_shape=(n_steps, len(FEATURES))))
+            model.add(Dropout(dropout))
+            model.add(LSTM(units2, activation='relu'))
+            model.add(Dropout(dropout))
+        else:
+            model.add(LSTM(units, activation='relu', input_shape=(n_steps, len(FEATURES))))
+            model.add(Dropout(dropout))
         model.add(Dense(1))
         model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss='mse')
 
@@ -193,10 +206,21 @@ def train_lstm_model_mv(hostname, steps_ahead=2):
         val_loss = float(min(history.history['val_loss']))
         print(f'[MV TRAIN] {hostname}: val_loss={val_loss:.6f} (best; stopped @ {len(history.history["val_loss"])})')
 
-        fname = f'{_loss_to_str(val_loss)}_{datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")}_{epochs}_{n_steps}_{units}_{steps_ahead}ahead.keras'
+        # Validation RMSE/MAE in mem% (unscaled absolute forecast). Used for
+        # model selection and stored in the filename prefix.
+        pred_delta = model.predict(Xval, verbose=0).flatten()
+        pred_mem = va_now + pred_delta * (mx[mem_idx] - mn[mem_idx])
+        val_rmse = float(sqrt(mean((pred_mem - va_fut) ** 2)))
+        val_mae = float(mean(abs(pred_mem - va_fut)))
+        print(f'[MV TRAIN] {hostname}: val RMSE={val_rmse:.3f} MAE={val_mae:.3f} (mem%)')
+
+        fname = (f'{val_rmse:.3f}_'
+                 f'{datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")}_'
+                 f'{epochs}_{n_steps}_{units}_{units2}_{num_layers}_{steps_ahead}ahead.keras')
         model.save(f'{MODEL_DIR}/{hostname}/{fname}')
         with open(f'{MODEL_DIR}/{hostname}/{fname}.norm.json', 'w') as f:
-            json.dump({'min': mn.tolist(), 'max': mx.tolist(), 'target': 'delta'}, f)
+            json.dump({'min': mn.tolist(), 'max': mx.tolist(), 'target': 'delta',
+                       'hp': hp}, f)
         print(f'[MV MODEL SAVED] {hostname}: {fname}')
         return fname
     except Exception as e:
@@ -338,7 +362,7 @@ class MVLSTMTrainingManager:
 
     def _validate_and_update(self, hostname, filename):
         """Validate the JUST-TRAINED model against the current RAM; if error
-        < 5pp, pull its recorded loss toward the real error (0.7*old + 0.3*error)."""
+        < 5pp, pull its recorded RMSE toward the real error (0.7*old + 0.3*error)."""
         try:
             import ram_usage
             loaded = _load_model(hostname, filename)
@@ -351,16 +375,16 @@ class MVLSTMTrainingManager:
                 return
             error = abs(pred - actual)
             if error < 5:
-                old_loss = float(filename.split('_')[0])
-                new_loss = old_loss * 0.7 + error * 0.3
-                self._rename_loss(hostname, filename, new_loss)
+                old_rmse = float(filename.split('_')[0])
+                new_rmse = old_rmse * 0.7 + error * 0.3
+                self._rename_rmse(hostname, filename, new_rmse)
             print(f'[MV PREDICT CHECK] {hostname}: pred={pred:.2f} actual={actual:.2f} error={error:.2f}')
         except Exception as e:
             print(f'[MV PREDICT CHECK ERROR] {hostname}: {e}')
 
-    def _rename_loss(self, hostname, old_file, new_loss):
-        parts = old_file.replace('.keras', '').split('_')
-        new_file = f'{_loss_to_str(new_loss)}_{parts[1]}_{parts[2]}_{parts[3]}_{parts[4]}_{parts[5]}ahead.keras'
+    def _rename_rmse(self, hostname, old_file, new_rmse):
+        rest = old_file.split('_', 1)[1]  # preserve everything after the RMSE field
+        new_file = f'{new_rmse:.3f}_{rest}'
         for suffix in ('', '.norm.json'):
             try:
                 os.rename(f'{MODEL_DIR}/{hostname}/{old_file}{suffix}',
@@ -369,7 +393,7 @@ class MVLSTMTrainingManager:
                 pass
         with self._cache_lock:
             self._cache.pop(hostname, None)
-        print(f'[MV MODEL UPDATE] {hostname}: {old_file} -> {new_file} (loss {new_loss:.6f})')
+        print(f'[MV MODEL UPDATE] {hostname}: {old_file} -> {new_file} (RMSE {new_rmse:.3f})')
 
     def stop_training(self):
         self._stop_event.set()
