@@ -32,6 +32,7 @@ valid_params = [
     '-on', '--on',
     '-off', '--off',
     '-s', '--status',
+    '-sc', '--scoreboard',
     '-v', '--verifier',
     '-i', '--instantiator',
     '-o', '--orchestrator',
@@ -47,6 +48,7 @@ Syntax:
 Manual utilities:
 	-r,   --registrator                  identifies and registers hosts
 	-s,   --status                        shows information about Compute hosts (refreshes every 10s)
+	-sc,  --scoreboard [N]                shows the top N LSTM models per host (default 5, refreshes every 10s)
 	-on,  --on [QT]                       starts a quantity [QT] of instances
 	-off, --off [QT]                      shuts down quantity [QT] of instances
 
@@ -89,6 +91,36 @@ def main():
                             pass
             except:
                 pass
+            sleep(10)
+
+    elif arg1 in ('--scoreboard', '-sc'):
+        import scoreboard
+        top_n = 5
+        if len(sys.argv) > 2:
+            try:
+                top_n = int(sys.argv[2])
+            except ValueError:
+                top_n = 5
+        while True:
+            try:
+                data = scoreboard.get(top_n=top_n)
+                totals = scoreboard.total_models()
+                print('[Scoreboard - LSTM multivariado]\n')
+                if not data:
+                    print('Nenhum modelo/placar encontrado '
+                          '(o orchestrator no modo lstm ainda não pontuou).')
+                for host, entries in data.items():
+                    total = totals.get(host, len(entries))
+                    print('--- %s (TOP %d de %d modelos) ---' % (host, len(entries), total))
+                    for i, e in enumerate(entries):
+                        mark = '  <-- winner' if i == 0 else ''
+                        recent = e.get('recent_err')
+                        r = '-' if recent is None else '%.2f' % recent
+                        print('  RMSE %-8.3f  mean %-6.2f  n %-4d  recent %-6s  eff %-8.3f  %s%s' % (
+                            e['rmse'], e['mean_err'], e['n'], r, e['effective'], e['filename'], mark))
+                    print('')
+            except Exception as ex:
+                print('Erro ao ler o placar: %s' % ex)
             sleep(10)
 
     elif arg1 in ('--on', '-on'):

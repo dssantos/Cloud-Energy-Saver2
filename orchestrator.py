@@ -104,6 +104,48 @@ class ExperimentOrchestrator:
 		except Exception as e:
 			print(f'   ⚠ Reset falhou para {host}: {e}')
 
+	def _recover_capacity(self, failed_vm):
+		"""Recupera capacidade após falha de alocação de VM.
+
+		Se nenhum host 'up' tem menos de MAX_VMS_PER_HOST VMs, acorda o próximo
+		host offline (que não esteja travado com VMs). Quebra o deadlock quando um
+		host sobrecarregado trava (down c/ VMs) e nenhum outro compute é ligado.
+		"""
+		try:
+			import config
+			hosts = status.get()
+			up = [h for h in hosts if h.get('state') == 'up']
+			if any(h.get('vms', 0) < config.MAX_VMS_PER_HOST for h in up):
+				return  # ainda há capacidade em algum host up
+			stuck = {h['hostname'] for h in hosts
+			         if h.get('state') != 'up' and h.get('vms', 0) > 0}
+			offline = [h['hostname'] for h in hosts
+			           if h.get('state') != 'up' and h['hostname'] not in stuck]
+			if not offline:
+				print(f'   [RECOVERY] {failed_vm} falhou; sem host offline disponível (stuck={sorted(stuck)}).')
+				return
+			offline.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
+			target = offline[0]
+			print(f'   [RECOVERY] {failed_vm} falhou e nenhum host up tem < {config.MAX_VMS_PER_HOST} VMs. Acordando {target}...')
+			verifier.wake_times[target] = time.time()
+			changestate.wake(target)
+		except Exception as e:
+			print(f'   [RECOVERY ERROR] {e}')
+
+	def _reset_overloaded_hosts(self):
+		"""Entre ciclos: reinicia computes que ficaram com > MAX_VMS_PER_HOST VMs
+		presas (host travou durante criação/deleção e não foi limpo)."""
+		try:
+			import config
+			hosts = status.get()
+			for h in hosts:
+				vms = h.get('vms', 0)
+				if vms > config.MAX_VMS_PER_HOST:
+					print(f'   [RESET] {h["hostname"]} com {vms} VMs (> {config.MAX_VMS_PER_HOST}). Reiniciando...')
+					self._force_reset_host(h['hostname'])
+		except Exception as e:
+			print(f'   [RESET ERROR] {e}')
+
 	def wait_hosts_ready(self, timeout=300):
 		"""Wait for controller and all computes to reach UP state.
 		On timeout, force-reset stuck computes via VBoxManage and re-wait."""
@@ -360,6 +402,7 @@ class ExperimentOrchestrator:
 			# the verifier still uses the univariate predict.lstm for decisions)
 			try:
 				import predict_mv
+				predict_mv.mv_manager.reset_scores()  # fresh scoreboard for this run
 				for hostname in registered:
 					predict_mv.mv_manager.start_training(hostname)
 				print(f'   ✓ Multivariate LSTM training iniciado ({len(registered)} hosts)')
@@ -440,6 +483,7 @@ class ExperimentOrchestrator:
 
 					if result.get('sla_violation'):
 						self.results['sla_violations'] += 1
+						self._recover_capacity(vm_name)
 
 					self.print_progress(i + 1, self.num_vms, f'VMs criadas: {i+1}/{self.num_vms}')
 
@@ -471,6 +515,9 @@ class ExperimentOrchestrator:
 					instances.off(1)  # Delete last VM
 
 					self.print_progress(i + 1, self.num_vms, f'VMs deletadas: {i+1}/{self.num_vms}')
+
+				# Verificar computes com VMs presas (travados) antes do próximo ciclo
+				self._reset_overloaded_hosts()
 
 				# Pausa antes do próximo ciclo
 				print(f'\n   Aguardando 30s antes do próximo ciclo...')
