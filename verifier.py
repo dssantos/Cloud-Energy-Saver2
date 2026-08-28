@@ -40,6 +40,9 @@ sla_violating_hosts = set()
 # If a host was 'up' with VMs>0 and goes down, it generates an SLA host_down_unexpected.
 prev_host_state = {}
 
+# Rolling history of avg_actual (real load) for the wake-grace trend check.
+load_history = []  # [(timestamp, avg_actual)]
+
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
     """
@@ -124,6 +127,74 @@ def wait_for_state_change(hostname, target_state, timeout=300, details_collector
 
     # Mark as failed but continue execution
     return False
+
+
+def _record_load(avg_actual):
+    """Append the latest real load reading to the rolling history."""
+    global load_history
+    now = time.time()
+    load_history.append((now, avg_actual))
+    load_history = [(t, v) for t, v in load_history if now - t <= config.WAKE_GRACE_SECONDS + config.LOAD_TREND_WINDOW_S]
+
+
+def _trend_vote(samples):
+    """+1 (rising), -1 (falling) or 0 (flat) for a single sequence of values."""
+    n = len(samples)
+    half = n // 2
+    first = sum(samples[:half]) / half
+    second = sum(samples[half:]) / (n - half)
+    d = second - first
+    if d > config.LOAD_TREND_MARGIN:
+        return 1
+    if d < -config.LOAD_TREND_MARGIN:
+        return -1
+    return 0
+
+
+def _load_trend_votes():
+    """'rising', 'falling', 'flat' or None (insufficient history).
+
+    Avalia 3 sequências: os X dados mais recentes, e os mesmos X com lag t-1 e
+    t-2. Só reporta uma direção quando as 3 concordam (robusto a picos isolados).
+    """
+    values = [v for _, v in load_history]
+    X = config.LOAD_TREND_SAMPLES
+    if len(values) < X + 2:
+        return None
+    votes = [_trend_vote(values[-(X + lag):(-lag if lag else None)]) for lag in (0, 1, 2)]
+    if all(v == 1 for v in votes):
+        return 'rising'
+    if all(v == -1 for v in votes):
+        return 'falling'
+    return 'flat'
+
+
+def _load_is_rising():
+    """True se a tendência (robusta a 3 lags) é de alta, ou no aquecimento."""
+    d = _load_trend_votes()
+    return d is None or d == 'rising'
+
+
+def _load_is_falling():
+    """True se a tendência (robusta a 3 lags) é de queda, ou no aquecimento."""
+    d = _load_trend_votes()
+    return d is None or d == 'falling'
+
+
+def _recently_woke():
+    """True se algum host foi acordado nos últimos WAKE_BOOT_GRACE_S segundos."""
+    if not wake_times:
+        return False
+    latest = max(wake_times.values())
+    return time.time() - latest < config.WAKE_BOOT_GRACE_S
+
+
+def _recently_shutdown():
+    """True se algum host foi desligado (pelo verifier) nos últimos WAKE_BOOT_GRACE_S segundos."""
+    if not recent_shutdown_cooldowns:
+        return False
+    latest = max(recent_shutdown_cooldowns.values())
+    return time.time() - latest < config.WAKE_BOOT_GRACE_S
 
 
 def is_in_wake_grace(hostname):
@@ -235,7 +306,7 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
                 # Try multivariate model first (more features, better anticipation if trained)
                 try:
                     import predict_mv
-                    mv_pred = predict_mv.lstm_mv(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
+                    mv_pred = predict_mv.lstm_mv(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD, actual=actual)
                     if mv_pred is not None:
                         ram_val = mv_pred
                         predicted_values.append(ram_val)
@@ -384,6 +455,7 @@ def run(lim_max, lim_med, predict_model):
     # avg_actual: real load (all active hosts) -> logged to cluster CSV and events
     # avg_predicted: LSTM predictions mean (None when predict_model != 'lstm')
     ram_avg, overloaded, normal, avg_predicted, avg_actual = calculate_ram_average(hosts, lim_max, predict_model)
+    _record_load(avg_actual)
 
     def _fmt(host_list):
         """Format host list with RAM and VM count for single-line logging."""
@@ -432,34 +504,10 @@ def run(lim_max, lim_med, predict_model):
 
 ## Logic of the management of the hosts to be turned on and off
 
-    # EMERGENCY: all normal hosts overloaded and offline hosts available
-    if len(overloaded) > 0 and len(normal) == 0 and len(offline) > 0:
-        emergency_host = select_wake_host(offline)
-        if emergency_host is None:
-            print('EMERGÊNCIA: offline em anti-flap (recém-desligados) — aguardando ao invés de re-acordar (SLA já registrado).')
-        else:
-            print(f'EMERGÊNCIA: Todos os hosts normais sobrecarregados! Acordando {emergency_host}...')
-            event_logger.logger.log(Event(
-                timestamp=datetime.now().isoformat(),
-                event_type='wake',
-                hostname=emergency_host,
-                trigger_type=f'{predict_model}_emergency',
-                ram_avg=avg_actual,
-                lim_max=lim_max,
-                lim_med=lim_med,
-                running_hosts=len(running),
-                idle_hosts=len(idle),
-                offline_hosts=len(offline),
-                predicted_ram=avg_predicted,
-                actual_ram=avg_actual
-            ))
-            # Record wake time (unified) to prevent immediate shutdown
-            wake_times[emergency_host] = time.time()
-            changestate.wake(emergency_host)
-
     # PREDICTIVE (lstm only): prediction > lim_max but real load still <= lim_max -> wake early
-    elif (predict_model == 'lstm' and avg_predicted is not None
+    if (predict_model == 'lstm' and avg_predicted is not None
           and avg_predicted > lim_max and avg_actual <= lim_max
+          and _load_is_rising() and not _recently_woke() and not _recently_shutdown()
           and len(idle) == 0 and len(offline) > 0):
         predictive_host = select_wake_host(offline)
         if predictive_host is None:
@@ -484,7 +532,9 @@ def run(lim_max, lim_med, predict_model):
             wake_times[predictive_host] = time.time()
 
     # REACTIVE: real load > lim_max, no idle buffer, offline available -> wake (default mode wakes here)
-    elif avg_actual > lim_max and len(idle) == 0 and len(offline) > 0:
+    elif (avg_actual > lim_max and _load_is_rising()
+          and not _recently_woke() and not _recently_shutdown()
+          and len(idle) == 0 and len(offline) > 0):
         reactive_host = select_wake_host(offline)
         if reactive_host is None:
             print('REATIVO: offline em anti-flap (recém-desligados) — aguardando.')
@@ -507,6 +557,10 @@ def run(lim_max, lim_med, predict_model):
             changestate.wake(reactive_host)
             wake_times[reactive_host] = time.time()
 
+    # Recently woke a host -> wait for it to come up before waking another
+    elif (_recently_woke() or _recently_shutdown()) and avg_actual > lim_max and len(offline) > 0:
+        print(f'AGUARDANDO: mudança de estado recente (wake/shutdown) — sem novo wake (carga {avg_actual:.1f}%).')
+
     # HIGH LOAD but cannot add capacity: keep idle hosts to absorb load (never shut down under high load)
     elif avg_actual > lim_max:
         if len(idle) > 0:
@@ -514,7 +568,7 @@ def run(lim_max, lim_med, predict_model):
         else:
             print(f'Carga alta ({avg_actual:.1f}%) — sem idle/offline: {_fmt(running)} — limite de capacidade.')
     else:
-        if len(idle) > 0:
+        if len(idle) > 0 and _load_is_falling():
             if ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
                 # Filter out hosts in wake grace (recently woken -> protect from shutdown)
                 idle_ok = [h for h in idle if not is_in_wake_grace(h)]

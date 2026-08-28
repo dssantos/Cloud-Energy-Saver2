@@ -49,6 +49,10 @@ TARGET = 'mem'
 TRAIN_INTERVAL_S = 600  # retrain every 10 min
 MODEL_CACHE_TTL_S = 600  # model cache expiry (reload from disk when stale)
 MAX_MODELS_PER_HOST = 20  # prune to top-N by val_loss
+SCORE_WEIGHT = 0.1        # W in: effective = (1-W)*rmse + W*mean_error (blend toward runtime error)
+SCOREBOARD_FILE = 'scoreboard.json'  # periodic dump of the runtime scoreboard
+RE_EVAL_TOP_N = 5        # non-winner models to re-evaluate per cycle
+RE_EVAL_WINDOWS = 30     # recent history windows used in re-evaluation
 
 # Feature-engineering hyperparameters
 RECENCY_DECAY_S = 300.0   # exp decay for rec_create/rec_delete (5 min → ~0.37)
@@ -244,8 +248,12 @@ def _list_models(hostname):
     return cand
 
 
-def select_best_model_mv(hostname):
-    """Return filename of the model with lowest val_loss, pruning to the top-N."""
+def select_best_model_mv(hostname, effective_map=None):
+    """Return filename of the best model by effective score, pruning to top-N by
+    raw filename RMSE.
+
+    effective_map: {filename: effective_score} (optional; falls back to raw RMSE).
+    """
     cand = _list_models(hostname)
     if not cand:
         return None
@@ -255,7 +263,10 @@ def select_best_model_mv(hostname):
                 os.remove(f'{MODEL_DIR}/{hostname}/{worst}{suffix}')
             except OSError:
                 pass
-    return cand[0][1]
+    keep = cand[:MAX_MODELS_PER_HOST]
+    if effective_map:
+        keep = sorted(keep, key=lambda p: effective_map.get(p[1], p[0]))
+    return keep[0][1]
 
 
 def _load_model(hostname, filename):
@@ -300,17 +311,58 @@ def _predict_with(hostname, model, mn, mx, n_steps, filename):
         return None
 
 
-def lstm_mv(hostname, steps_ahead=2):
+def _recent_error(hostname, model, mn, mx, n_steps, steps_ahead=2, max_windows=30):
+    """Walk-forward mean error of `model` over the most recent history windows.
+
+    Uses the saved workload_mv history (real future values are known), so it can
+    score a model's predictive ability without using it for the live decision.
+    Returns (mean_error_mem%, n_windows) or None.
+    """
+    try:
+        df = pd.read_csv(f'{MV_DIR}/{hostname}.csv')
+        df['time_stamp'] = pd.to_datetime(df['time_stamp'], format='%Y-%m-%d %H:%M:%S')
+        df = df.set_index('time_stamp').sort_index()
+        dfe = _engineer(df)[FEATURES].dropna()
+        if len(dfe) < n_steps + steps_ahead:
+            return None
+        mem_idx = FEATURES.index(TARGET)
+        vals = dfe[FEATURES].values.astype('float64')
+        span = mx[mem_idx] - mn[mem_idx]
+        errors = []
+        total = len(vals)
+        start = max(0, total - max_windows - n_steps - steps_ahead)
+        for i in range(start, total - n_steps - steps_ahead + 1):
+            win = vals[i:i + n_steps]
+            last_mem = vals[i + n_steps - 1, mem_idx]
+            fut = vals[i + n_steps + steps_ahead - 1, mem_idx]
+            xs = _scale(win, mn, mx).reshape(1, n_steps, len(FEATURES))
+            d = model.predict(xs, verbose=0)[0][0]
+            pred = last_mem + d * span
+            errors.append(abs(pred - fut))
+        if not errors:
+            return None
+        return float(mean(errors)), len(errors)
+    except Exception:
+        return None
+
+
+def lstm_mv(hostname, steps_ahead=2, actual=None):
     """Predict mem steps_ahead ahead using the best multivariate model.
 
     Returns the predicted mem (%), or None if no model / not enough data.
     Uses the manager's model cache to avoid reloading from disk each cycle.
+
+    When `actual` (live mem%) is provided, records a runtime accuracy score for
+    the chosen model; the scoreboard drives the next selection re-rank.
     """
     loaded = mv_manager.get_model(hostname)
     if loaded is None:
         return None
     model, mn, mx, n_steps, filename = loaded
-    return _predict_with(hostname, model, mn, mx, n_steps, filename)
+    pred = _predict_with(hostname, model, mn, mx, n_steps, filename)
+    if pred is not None and actual is not None and actual > 0:
+        mv_manager.record_score(hostname, filename, abs(pred - actual))
+    return pred
 
 
 class MVLSTMTrainingManager:
@@ -320,6 +372,9 @@ class MVLSTMTrainingManager:
         self._hosts = {}
         self._cache = {}          # hostname -> (model, mn, mx, n_steps, filename, timestamp)
         self._cache_lock = threading.Lock()
+        self._scores = {}         # hostname -> {filename: [sum_error, count]}  (live verifier predictions)
+        self._re_eval = {}        # hostname -> {filename: recent_history_mean_error}
+        self._scores_lock = threading.Lock()
         self._stop_event = threading.Event()
 
     def start_training(self, hostname):
@@ -329,18 +384,123 @@ class MVLSTMTrainingManager:
         t.start()
         self._hosts[hostname] = t
 
-    def get_model(self, hostname):
-        """Return cached (model, mn, mx, n_steps, filename) or reload from disk."""
-        with self._cache_lock:
-            if hostname in self._cache:
-                model, mn, mx, n_steps, filename, ts = self._cache[hostname]
-                if time.time() - ts < MODEL_CACHE_TTL_S:
-                    return model, mn, mx, n_steps, filename
-                del self._cache[hostname]
+    def record_score(self, hostname, filename, error):
+        """Accumulate one prediction error for (hostname, filename)."""
+        with self._scores_lock:
+            e = self._scores.setdefault(hostname, {}).setdefault(filename, [0.0, 0])
+            e[0] += float(error)
+            e[1] += 1
+            mean = e[0] / e[1]
+            n = e[1]
+        print(f'[MV SCORE] {hostname}: {filename} err={error:.2f} mean={mean:.2f} (n={n})')
+        self.dump_scoreboard()
 
-        filename = select_best_model_mv(hostname)
+    def reset_scores(self, hostname=None):
+        """Clear the scoreboard (all hosts, or one host). Called at run start."""
+        with self._scores_lock:
+            if hostname is None:
+                self._scores.clear()
+                self._re_eval.clear()
+            else:
+                self._scores.pop(hostname, None)
+                self._re_eval.pop(hostname, None)
+        self.dump_scoreboard()
+
+    def _effective_for(self, hostname, rmse, filename):
+        """Ranking score for a model: live mean if it has verifier predictions,
+        else its recent re-eval mean, else its raw RMSE (unscored)."""
+        with self._scores_lock:
+            entry = self._scores.get(hostname, {}).get(filename)
+            recent = self._re_eval.get(hostname, {}).get(filename)
+        if entry and entry[1] > 0:
+            return (1.0 - SCORE_WEIGHT) * rmse + SCORE_WEIGHT * (entry[0] / entry[1])
+        if recent is not None:
+            return (1.0 - SCORE_WEIGHT) * rmse + SCORE_WEIGHT * recent
+        return rmse
+
+    def _effective_map(self, hostname):
+        """{filename: effective_score} for all models of a host."""
+        return {fn: self._effective_for(hostname, rmse, fn)
+                for rmse, fn in _list_models(hostname)}
+
+    def dump_scoreboard(self):
+        """Write the current scoreboard (models + runtime scores) to SCOREBOARD_FILE."""
+        try:
+            hosts = set()
+            if os.path.isdir(MODEL_DIR):
+                hosts.update(d for d in os.listdir(MODEL_DIR)
+                             if os.path.isdir(f'{MODEL_DIR}/{d}'))
+            with self._scores_lock:
+                hosts.update(self._scores.keys())
+                hosts.update(self._re_eval.keys())
+            payload = {'updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                       'score_weight': SCORE_WEIGHT,
+                       'hosts': {}}
+            for host in sorted(hosts):
+                entries = []
+                for rmse, filename in _list_models(host):
+                    with self._scores_lock:
+                        entry = self._scores.get(host, {}).get(filename)
+                        recent = self._re_eval.get(host, {}).get(filename)
+                    mean_e = entry[0] / entry[1] if entry and entry[1] > 0 else 0.0
+                    n = entry[1] if entry else 0
+                    entries.append({'rmse': round(rmse, 3),
+                                    'mean_err': round(mean_e, 2),
+                                    'n': n,
+                                    'recent_err': round(recent, 2) if recent is not None else None,
+                                    'effective': round(self._effective_for(host, rmse, filename), 3),
+                                    'filename': filename})
+                entries.sort(key=lambda x: x['effective'])
+                payload['hosts'][host] = entries
+            with open(SCOREBOARD_FILE, 'w') as f:
+                json.dump(payload, f, indent=2)
+        except Exception:
+            pass
+
+    def record_eval(self, hostname, filename, mean_error, n_windows):
+        """Store a model's recent-history accuracy (does NOT touch the live n)."""
+        with self._scores_lock:
+            self._re_eval.setdefault(hostname, {})[filename] = float(mean_error)
+        print(f'[MV RE-EVAL] {hostname}: {filename} recent_err={mean_error:.2f} '
+              f'(n={n_windows}w)')
+        self.dump_scoreboard()
+
+    def re_evaluate_competitors(self, hostname):
+        """Periodically re-score non-winner models against recent history so their
+        scoreboard stays fresh even when they are not the live prediction model."""
+        try:
+            cand = _list_models(hostname)
+            if not cand:
+                return
+            eff = self._effective_map(hostname)
+            # rank by effective ascending; skip the winner
+            ranked = sorted(cand, key=lambda p: eff.get(p[1], p[0]))
+            competitors = ranked[1:1 + RE_EVAL_TOP_N]
+            for rmse, filename in competitors:
+                loaded = _load_model(hostname, filename)
+                if loaded is None:
+                    continue
+                model, mn, mx, n_steps = loaded
+                r = _recent_error(hostname, model, mn, mx, n_steps,
+                                  steps_ahead=2, max_windows=RE_EVAL_WINDOWS)
+                if r is not None:
+                    self.record_eval(hostname, filename, r[0], r[1])
+        except Exception as e:
+            print(f'[MV RE-EVAL ERROR] {hostname}: {e}')
+
+    def get_model(self, hostname):
+        """Return cached (model, mn, mx, n_steps, filename) or reload from disk.
+
+        Re-ranks using the runtime scoreboard on every call, but only reloads the
+        model file when the winner changes (avoids re-loading every cycle).
+        """
+        filename = select_best_model_mv(hostname, self._effective_map(hostname))
         if not filename:
             return None
+        with self._cache_lock:
+            cached = self._cache.get(hostname)
+            if cached and cached[4] == filename:
+                return cached[:5]
         loaded = _load_model(hostname, filename)
         if loaded is None:
             return None
@@ -354,46 +514,16 @@ class MVLSTMTrainingManager:
             try:
                 filename = train_lstm_model_mv(hostname, steps_ahead=2)
                 if filename:
-                    self._validate_and_update(hostname, filename)
+                    with self._cache_lock:
+                        self._cache.pop(hostname, None)  # new model competes next cycle
             except Exception as e:
                 print(f'[MV TRAIN LOOP ERROR] {hostname}: {e}')
+            try:
+                self.re_evaluate_competitors(hostname)
+            except Exception as e:
+                print(f'[MV RE-EVAL LOOP ERROR] {hostname}: {e}')
             if self._stop_event.wait(TRAIN_INTERVAL_S):
                 break
-
-    def _validate_and_update(self, hostname, filename):
-        """Validate the JUST-TRAINED model against the current RAM; if error
-        < 5pp, pull its recorded RMSE toward the real error (0.7*old + 0.3*error)."""
-        try:
-            import ram_usage
-            loaded = _load_model(hostname, filename)
-            if loaded is None:
-                return
-            model, mn, mx, n_steps = loaded
-            pred = _predict_with(hostname, model, mn, mx, n_steps, filename)
-            actual = ram_usage.get(hostname)
-            if pred is None or actual <= 0:
-                return
-            error = abs(pred - actual)
-            if error < 5:
-                old_rmse = float(filename.split('_')[0])
-                new_rmse = old_rmse * 0.7 + error * 0.3
-                self._rename_rmse(hostname, filename, new_rmse)
-            print(f'[MV PREDICT CHECK] {hostname}: pred={pred:.2f} actual={actual:.2f} error={error:.2f}')
-        except Exception as e:
-            print(f'[MV PREDICT CHECK ERROR] {hostname}: {e}')
-
-    def _rename_rmse(self, hostname, old_file, new_rmse):
-        rest = old_file.split('_', 1)[1]  # preserve everything after the RMSE field
-        new_file = f'{new_rmse:.3f}_{rest}'
-        for suffix in ('', '.norm.json'):
-            try:
-                os.rename(f'{MODEL_DIR}/{hostname}/{old_file}{suffix}',
-                          f'{MODEL_DIR}/{hostname}/{new_file}{suffix}')
-            except OSError:
-                pass
-        with self._cache_lock:
-            self._cache.pop(hostname, None)
-        print(f'[MV MODEL UPDATE] {hostname}: {old_file} -> {new_file} (RMSE {new_rmse:.3f})')
 
     def stop_training(self):
         self._stop_event.set()
