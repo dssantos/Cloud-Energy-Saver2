@@ -49,9 +49,6 @@ WAKE_BOOT_GRACE_S = 120              # após um wake, não acordar OUTRO host (a
 SHUTDOWN_COOLDOWN_SECONDS = 600      # após um shutdown, não re-acordar o host (evita religamento/flapping)
 SHUTDOWN_FLAP_BLOCK_S = 300          # janela anti-flap: mesmo em emergency, não re-acordar host desligado há menos disso
 IDLE_DELETE_RECENCY_S = 180          # se VMs foram deletadas do host há menos disso, é ocioso genuíno -> pode desligar
-LOAD_TREND_WINDOW_S = 180            # janela (s) p/ checar tendência da carga na 2ª metade do wake grace
-LOAD_TREND_MARGIN = 1.0              # margem mínima (pp) p/ considerar que a carga está subindo
-LOAD_TREND_SAMPLES = 6               # nº de amostras por sequência na análise de tendência (lag 0/1/2)
 
 # --- SLA ---
 SLA_RAM_MARGIN_PCT = 10            # SLA #1 (ram_over_threshold): host > lim_max * (1 + this/100). Ex.: lim_max 80 -> 88%
