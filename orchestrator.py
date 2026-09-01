@@ -334,16 +334,9 @@ class ExperimentOrchestrator:
 							for h in hosts:
 								if h.get('state') == 'up':
 									try:
-										try:
-											import predict_mv
-											p = predict_mv.lstm_mv(hostname=h['hostname'],
-											                       steps_ahead=config.STEPS_AHEAD)
-											if p is None:
-												p = predict.lstm(hostname=h['hostname'],
-												                 steps_ahead=config.STEPS_AHEAD)
-										except Exception:
-											p = predict.lstm(hostname=h['hostname'],
-											                 steps_ahead=config.STEPS_AHEAD)
+										import predict_mv
+										p = predict_mv.lstm_mv(hostname=h['hostname'],
+										                       steps_ahead=config.STEPS_AHEAD)
 										if p is not None:
 											preds.append(p)
 									except Exception:
@@ -392,16 +385,7 @@ class ExperimentOrchestrator:
 		except Exception as e:
 			print(f'   ! Erro ao logar estado inicial: {e}')
 
-		# Start workload collection for registered hosts
-		try:
-			print(f'   Iniciando workload collection para {len(registered)} hosts...')
-			for hostname in registered:
-				import workload
-				threading.Thread(target=workload.save, args=[hostname], daemon=True).start()
-		except:
-			print('   ! Nenhum host registrado para workload collection')
-
-		# Start multivariate workload collection (parallel pipeline -> workload_mv/{host}.csv)
+		# Multivariate workload collection (workload_mv/{host}.csv) — única pipeline
 		try:
 			import workload_mv
 			for hostname in registered:
@@ -410,18 +394,8 @@ class ExperimentOrchestrator:
 		except Exception as e:
 			print(f'   ! Erro ao iniciar multivariate workload: {e}')
 
-		# Initialize LSTM training for LSTM model
+		# Multivariate LSTM training (única pipeline de predição do verifier)
 		if self.predict_model == 'lstm':
-			try:
-				import predict
-				print(f'   Iniciando LSTM training para {len(registered)} hosts...')
-				for hostname in registered:
-					predict.lstm_manager.start_training(hostname)
-				print(f'   ✓ LSTM training iniciado')
-			except Exception as e:
-				print(f'   ! Erro ao iniciar LSTM training: {e}')
-			# Multivariate pipeline: trains models_mv/{host}/ in parallel (evaluation only;
-			# the verifier still uses the univariate predict.lstm for decisions)
 			try:
 				import predict_mv
 				predict_mv.mv_manager.reset_scores()  # fresh scoreboard for this run
@@ -586,8 +560,8 @@ class ExperimentOrchestrator:
 			print(f'   ! Erro ao logar estado final: {e}')
 		try:
 			if self.predict_model == 'lstm':
-				import predict
-				predict.lstm_manager.stop_training()
+				import predict_mv
+				predict_mv.mv_manager.stop_training()
 		except Exception as e:
 			print(f'   ! Erro ao parar LSTM training: {e}')
 

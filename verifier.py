@@ -9,7 +9,8 @@ import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
-import workload, predict
+import predict
+import workload_mv, predict_mv
 import event_logger
 import host_metrics
 import host_recovery
@@ -207,18 +208,15 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
             actual_values.append(actual)  # live reading (real load)
             ram_val = actual
             if predict_model == 'lstm':
-                # Try multivariate model first (more features, better anticipation if trained)
+                # Multivariate pipeline: única fonte de predição. Sem modelo/dados
+                # disponíveis -> mantém ram_val = atual e não alimenta avg_predicted.
                 try:
                     import predict_mv
                     mv_pred = predict_mv.lstm_mv(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD, actual=actual)
-                    if mv_pred is not None:
-                        ram_val = mv_pred
-                        predicted_values.append(ram_val)
-                    else:
-                        ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
-                        predicted_values.append(ram_val)
                 except Exception:
-                    ram_val = predict.lstm(hostname=host['hostname'], steps_ahead=config.STEPS_AHEAD)
+                    mv_pred = None
+                if mv_pred is not None:
+                    ram_val = mv_pred
                     predicted_values.append(ram_val)
             elif predict_model == 'naive':
                 ram_val = predict.naive(host['hostname'])
@@ -544,24 +542,24 @@ def start(lim_max, lim_med, predict_model, continuous=False):
     # Log initial state
     log_initial_state()
 
-    # Initialize LSTM training manager if needed
+    # Initialize multivariate LSTM training if needed
     if predict_model == 'lstm':
         try:
             with open("registered.txt", "r") as file:
                 registered = ast.literal_eval(file.read())
 
             for hostname in registered:
-                predict.lstm_manager.start_training(hostname)
+                predict_mv.mv_manager.start_training(hostname)
 
-            print(f'Started LSTM training for {len(registered)} hosts')
+            print(f'Started multivariate LSTM training for {len(registered)} hosts')
         except Exception as e:
-            print(f'Error initializing LSTM training: {e}')
+            print(f'Error initializing multivariate LSTM training: {e}')
 
-    # Start workload collection
-    print('\n\nIniciando coleta de cargas de trabalho...\n')
+    # Start multivariate workload collection
+    print('\n\nIniciando coleta multivariada de cargas de trabalho...\n')
     hosts = status.get()
     for host in hosts:
-        threading.Thread(target=workload.save, args=[host['hostname']]).start()
+        threading.Thread(target=workload_mv.save, args=[host['hostname']]).start()
 
     # Main verification loop
     try:
@@ -585,5 +583,5 @@ def start(lim_max, lim_med, predict_model, continuous=False):
         # Log final state before exiting
         log_final_state()
         if predict_model == 'lstm':
-            predict.lstm_manager.stop_training()
+            predict_mv.mv_manager.stop_training()
         raise

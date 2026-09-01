@@ -105,14 +105,24 @@ def _hp():
     }
 
 
-def _split_segments(df, gap_s=240):
+def _split_segments(df, gap_s=None):
     """Split a datetime-indexed df into continuous segments (gap > gap_s)."""
+    gap_s = config.GAP_S if gap_s is None else gap_s
     df = df.sort_index()
     if len(df) < 2:
         return [df] if len(df) else []
     dt = df.index.to_series().diff().dt.total_seconds().fillna(0)
     group = (dt > gap_s).cumsum()
     return [seg for _, seg in df.groupby(group)]
+
+
+def _window_contiguous(index, n_steps, gap_s=config.GAP_S):
+    """True se as últimas n_steps amostras são contíguas (sem gap > gap_s)."""
+    if len(index) < n_steps:
+        return False
+    w = index[-n_steps:]
+    dt = w.to_series().diff().dt.total_seconds().iloc[1:]
+    return bool((dt <= gap_s).all())
 
 
 def _fit_minmax(train_X):
@@ -297,6 +307,9 @@ def _predict_with(hostname, model, mn, mx, n_steps, filename):
         dfe = _engineer(df)[FEATURES].dropna()
         if len(dfe) < n_steps:
             return None
+        if not _window_contiguous(dfe.index, n_steps, config.GAP_S):
+            print(f'[MV PREDICT] {hostname}: janela com gap (host inacessível/recuperação) — sem predição.')
+            return None
         mem_idx = FEATURES.index(TARGET)
         window_raw = dfe[FEATURES].values.astype('float64')[-n_steps:]
         window = _scale(window_raw, mn, mx)
@@ -329,11 +342,16 @@ def _recent_error(hostname, model, mn, mx, n_steps, steps_ahead=2, max_windows=3
             return None
         mem_idx = FEATURES.index(TARGET)
         vals = dfe[FEATURES].values.astype('float64')
+        dt = dfe.index.to_series().diff().dt.total_seconds()
         span = mx[mem_idx] - mn[mem_idx]
         errors = []
         total = len(vals)
         start = max(0, total - max_windows - n_steps - steps_ahead)
         for i in range(start, total - n_steps - steps_ahead + 1):
+            # janela (i..i+n_steps-1) + alvo (i+n_steps+steps_ahead-1) devem ser contíguos
+            win_span = dt.iloc[i + 1:i + n_steps + steps_ahead]
+            if len(win_span) and float(win_span.max()) > config.GAP_S:
+                continue
             win = vals[i:i + n_steps]
             last_mem = vals[i + n_steps - 1, mem_idx]
             fut = vals[i + n_steps + steps_ahead - 1, mem_idx]
