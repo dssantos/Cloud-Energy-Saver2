@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import workload, predict
 import event_logger
 import host_metrics
+import host_recovery
 import config
 from event_logger import Event
 
@@ -348,6 +349,8 @@ def run(lim_max, lim_med, predict_model):
         prev_state, prev_vms = prev if isinstance(prev, tuple) else (prev, 0)
         if prev_state == 'up' and curr_state != 'up':
             print(f'[STATE] {h} up->down (INESPERADO): ram={host.get("ram",0):.1f}% vms={curr_vms} (antes: {prev_vms}) — possível crash/travamento por sobrecarga.')
+            # Registra para o orchestrator reiniciar o host no próximo ciclo
+            host_recovery.mark_crashed(h, 'host_down_unexpected', ram=host.get('ram', 0) or 0.0)
             if prev_vms > 0:
                 unexpected_downs[h] = ('host_down_unexpected', 0.0)
         prev_host_state[h] = (curr_state, curr_vms)

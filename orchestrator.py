@@ -18,6 +18,7 @@ import changestate
 import instances
 import verifier
 import registrator
+import host_recovery
 
 
 class ExperimentOrchestrator:
@@ -98,6 +99,7 @@ class ExperimentOrchestrator:
 			return
 		try:
 			print(f'   ⚡ Reset forçado VBoxManage: {host} (poweroff + startvm)')
+			host_recovery.mark_resetting(host)
 			__import__('subprocess').run(
 				f'ssh -o ConnectTimeout=10 {wu}@{wh} "VBoxManage controlvm {host} poweroff 2>/dev/null; sleep 3; VBoxManage startvm {host} --type=headless"',
 				shell=True, timeout=30, stdout=__import__('subprocess').DEVNULL, stderr=__import__('subprocess').DEVNULL)
@@ -144,6 +146,27 @@ class ExperimentOrchestrator:
 					self._force_reset_host(h['hostname'])
 		except Exception as e:
 			print(f'   [RESET ERROR] {e}')
+
+	def _recover_crashed_hosts(self):
+		"""Entre ciclos: reinicia computes registrados como travados
+		(host_down_unexpected, ver host_recovery/crashed_hosts.json) que
+		continuam fora. Reset recente (resetting_ts) é respeitado pela
+		janela RESET_GRACE_S dentro de host_recovery.pending()."""
+		try:
+			pending = host_recovery.pending()
+			if not pending:
+				return
+			hosts = {h['hostname']: h for h in status.get()}
+			for host, entry in sorted(pending.items()):
+				st = hosts.get(host) or {}
+				if st.get('state') == 'up':
+					print(f'   [RECOVERY] {host} voltou sozinho ({entry.get("reason")}); limpando registro.')
+					host_recovery.mark_recovered(host)
+					continue
+				print(f'   [RECOVERY] {host} travado ({entry.get("reason")}) e ainda fora — reiniciando...')
+				self._force_reset_host(host)
+		except Exception as e:
+			print(f'   [RECOVERY ERROR] {e}')
 
 	def wait_hosts_ready(self, timeout=300):
 		"""Wait for controller and all computes to reach UP state.
@@ -515,7 +538,8 @@ class ExperimentOrchestrator:
 
 					self.print_progress(i + 1, self.num_vms, f'VMs deletadas: {i+1}/{self.num_vms}')
 
-				# Verificar computes com VMs presas (travados) antes do próximo ciclo
+				# Reinicia computes que travaram no ciclo e verifica os com VMs presas
+				self._recover_crashed_hosts()
 				self._reset_overloaded_hosts()
 
 				# Pausa antes do próximo ciclo
