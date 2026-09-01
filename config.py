@@ -43,12 +43,12 @@ SLA_TIMEOUT = 120  # segundos (também definido em instances.py)
 VALIDATION_WINDOW_MIN = 15        # janela para validar se um wake foi necessário
 CLUSTER_SAMPLE_INTERVAL_S = 10    # cadência do logger de cluster_workload (era 20; antecipação ~0.8 min pede mais resolução)
 
-# --- Anti-flapping ---
-WAKE_GRACE_SECONDS = 300             # após QUALQUER wake, não desligar o host (dá tempo ao instantiator)
-WAKE_BOOT_GRACE_S = 120              # após um wake, não acordar OUTRO host (aguarda o recém-acordado subir)
-SHUTDOWN_COOLDOWN_SECONDS = 600      # após um shutdown, não re-acordar o host (evita religamento/flapping)
-SHUTDOWN_FLAP_BLOCK_S = 300          # janela anti-flap: mesmo em emergency, não re-acordar host desligado há menos disso
+# --- Ociosidade ---
 IDLE_DELETE_RECENCY_S = 180          # se VMs foram deletadas do host há menos disso, é ocioso genuíno -> pode desligar
+
+# --- Tendência do nº de VMs (fase create/delete do instantiator) ---
+VM_TREND_WINDOW_S = 300              # janela para medir se o nº de VMs está subindo/descendo
+VM_TREND_MIN_DELTA = 1               # variação mínima (em VMs) para considerar tendência de subida
 
 # --- SLA ---
 SLA_RAM_MARGIN_PCT = 10            # SLA #1 (ram_over_threshold): host > lim_max * (1 + this/100). Ex.: lim_max 80 -> 88%

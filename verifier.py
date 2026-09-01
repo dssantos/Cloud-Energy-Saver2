@@ -21,16 +21,6 @@ load_dotenv()
 lstm_manager = None
 experiment_start_time = None
 
-# Unified wake tracking: ALL wake branches (emergency, predictive, reactive) record
-# the wake time here so that recently-woken hosts are protected from immediate
-# shutdown (gives the instantiator time to place VMs on them).
-# Format: {hostname: timestamp_of_wake}
-wake_times = {}
-
-# Recent-shutdown cooldown tracking (anti-flapping: don't re-wake a host right after shutting it down)
-# Format: {hostname: timestamp_of_shutdown}
-recent_shutdown_cooldowns = {}
-
 # SLA violation: per-host transition tracking (edge detection across run() cycles).
 # False->True per host -> one event per episode per host.
 sla_violating_hosts = set()
@@ -39,6 +29,27 @@ sla_violating_hosts = set()
 # up->down transitions (crashes / hangs) that were NOT triggered by a verifier shutdown.
 # If a host was 'up' with VMs>0 and goes down, it generates an SLA host_down_unexpected.
 prev_host_state = {}
+
+# Rolling history of the cluster's TOTAL VM count, used to detect the instantiator's
+# create/delete phase.  The direction of the VM count is a leading signal: rising = more
+# load is coming (keep buffers, wake is justified); falling/flat = load is leaving (safe to
+# shut down idle hosts).  Format: [(timestamp, total_vms)].
+vm_history = []
+
+
+def _record_vm_count(total_vms):
+    """Append the current total VM count and prune entries older than the trend window."""
+    vm_history.append((time.time(), total_vms))
+    cutoff = time.time() - config.VM_TREND_WINDOW_S
+    while vm_history and vm_history[0][0] < cutoff:
+        vm_history.pop(0)
+
+
+def _vms_rising():
+    """True if the cluster's VM count increased over the trend window (create phase)."""
+    if len(vm_history) < 2:
+        return False
+    return (vm_history[-1][1] - vm_history[0][1]) >= config.VM_TREND_MIN_DELTA
 
 
 def send_alert_email(hostname, target_state, timeout_seconds, details=None):
@@ -126,67 +137,14 @@ def wait_for_state_change(hostname, target_state, timeout=300, details_collector
     return False
 
 
-def _recently_woke():
-    """True se algum host foi acordado nos últimos WAKE_BOOT_GRACE_S segundos."""
-    if not wake_times:
-        return False
-    latest = max(wake_times.values())
-    return time.time() - latest < config.WAKE_BOOT_GRACE_S
-
-
-def _recently_shutdown():
-    """True se algum host foi desligado (pelo verifier) nos últimos WAKE_BOOT_GRACE_S segundos."""
-    if not recent_shutdown_cooldowns:
-        return False
-    latest = max(recent_shutdown_cooldowns.values())
-    return time.time() - latest < config.WAKE_BOOT_GRACE_S
-
-
-def is_in_wake_grace(hostname):
-    """Check if host was recently woken and should be protected from shutdown."""
-    if hostname not in wake_times:
-        return False
-    elapsed = time.time() - wake_times[hostname]
-    if elapsed > config.WAKE_GRACE_SECONDS:
-        del wake_times[hostname]
-        return False
-    return True
-
-
-def is_in_shutdown_cooldown(hostname):
-    """Check if host is in recent-shutdown cooldown (anti-flapping: avoid re-waking right after a shutdown)."""
-    if hostname not in recent_shutdown_cooldowns:
-        return False
-    elapsed = time.time() - recent_shutdown_cooldowns[hostname]
-    if elapsed > config.SHUTDOWN_COOLDOWN_SECONDS:
-        del recent_shutdown_cooldowns[hostname]
-        return False
-    return True
-
-
 def select_wake_host(offline_list):
-    """Pick an offline host to wake, preferring those NOT in shutdown cooldown (anti-flapping).
-    offline_list is sorted ascending by host number (wake lower numbers first).
-    Fallback: if every offline host is in cooldown, wake the one shut down LONGEST ago
-    (earliest shutdown timestamp) so a genuine emergency is never fully blocked."""
-    candidates = [h for h in offline_list if not is_in_shutdown_cooldown(h)]
-    if candidates:
-        return candidates[0]
-    # All offline are in shutdown cooldown. Wake the one shut down longest ago, but ONLY if it
-    # is past the anti-flap window (SHUTDOWN_FLAP_BLOCK_S); otherwise return None so a genuine
-    # emergency waits instead of immediately re-waking the host it just shut down (shut->wake flap).
-    now = time.time()
-    past_antiflap = [h for h in offline_list
-                     if (now - recent_shutdown_cooldowns[h]) >= config.SHUTDOWN_FLAP_BLOCK_S]
-    if past_antiflap:
-        return min(past_antiflap, key=lambda h: recent_shutdown_cooldowns[h])
-    return None
+    """Pick an offline host to wake (lowest host number first)."""
+    return offline_list[0] if offline_list else None
 
 
 def shutdown_host(host):
-    """Shutdown a host and record the time (feeds the anti-flapping shutdown cooldown)."""
+    """Shutdown a host and mark it as intentionally down (not an unexpected transition)."""
     changestate.shutdown(host)
-    recent_shutdown_cooldowns[host] = time.time()
     # Mark as intentionally shut down so prev_host_state doesn't flag it as unexpected
     prev_host_state[host] = ('down', 0)
 
@@ -367,6 +325,9 @@ def run(lim_max, lim_med, predict_model):
 
     hosts = status.get()
 
+    # Track the cluster's total VM count to detect the instantiator's create/delete phase.
+    _record_vm_count(sum(h.get('vms', 0) for h in hosts))
+
     try:
         file = open("registered.txt", "r+")
         registered = file.read()
@@ -451,59 +412,47 @@ def run(lim_max, lim_med, predict_model):
     # PREDICTIVE (lstm only): prediction > lim_max but real load still <= lim_max -> wake early
     if (predict_model == 'lstm' and avg_predicted is not None
           and avg_predicted > lim_max and avg_actual <= lim_max
-          and not _recently_woke() and not _recently_shutdown()
+          and _vms_rising()
           and len(idle) == 0 and len(offline) > 0):
         predictive_host = select_wake_host(offline)
-        if predictive_host is None:
-            print('PREDITIVO: offline em anti-flap (recém-desligados) — aguardando.')
-        else:
-            print(f'PREDITIVO: previsão LSTM {avg_predicted:.1f}% > {lim_max}% (real {avg_actual:.1f}%). Acordando {predictive_host}...')
-            event_logger.logger.log(Event(
-                timestamp=datetime.now().isoformat(),
-                event_type='wake',
-                hostname=predictive_host,
-                trigger_type='lstm_predictive',
-                ram_avg=avg_actual,
-                lim_max=lim_max,
-                lim_med=lim_med,
-                running_hosts=len(running),
-                idle_hosts=len(idle),
-                offline_hosts=len(offline),
-                predicted_ram=avg_predicted,
-                actual_ram=avg_actual
-            ))
-            changestate.wake(predictive_host)
-            wake_times[predictive_host] = time.time()
+        print(f'PREDITIVO: previsão LSTM {avg_predicted:.1f}% > {lim_max}% (real {avg_actual:.1f}%). Acordando {predictive_host}...')
+        event_logger.logger.log(Event(
+            timestamp=datetime.now().isoformat(),
+            event_type='wake',
+            hostname=predictive_host,
+            trigger_type='lstm_predictive',
+            ram_avg=avg_actual,
+            lim_max=lim_max,
+            lim_med=lim_med,
+            running_hosts=len(running),
+            idle_hosts=len(idle),
+            offline_hosts=len(offline),
+            predicted_ram=avg_predicted,
+            actual_ram=avg_actual
+        ))
+        changestate.wake(predictive_host)
 
     # REACTIVE: real load > lim_max, no idle buffer, offline available -> wake (default mode wakes here)
     elif (avg_actual > lim_max
-          and not _recently_woke() and not _recently_shutdown()
+          and _vms_rising()
           and len(idle) == 0 and len(offline) > 0):
         reactive_host = select_wake_host(offline)
-        if reactive_host is None:
-            print('REATIVO: offline em anti-flap (recém-desligados) — aguardando.')
-        else:
-            print(f'REATIVO: carga real {avg_actual:.1f}% > {lim_max}%. Acordando {reactive_host}...')
-            event_logger.logger.log(Event(
-                timestamp=datetime.now().isoformat(),
-                event_type='wake',
-                hostname=reactive_host,
-                trigger_type='reactive',
-                ram_avg=avg_actual,
-                lim_max=lim_max,
-                lim_med=lim_med,
-                running_hosts=len(running),
-                idle_hosts=len(idle),
-                offline_hosts=len(offline),
-                predicted_ram=avg_predicted,
-                actual_ram=avg_actual
-            ))
-            changestate.wake(reactive_host)
-            wake_times[reactive_host] = time.time()
-
-    # Recently woke a host -> wait for it to come up before waking another
-    elif (_recently_woke() or _recently_shutdown()) and avg_actual > lim_max and len(offline) > 0:
-        print(f'AGUARDANDO: mudança de estado recente (wake/shutdown) — sem novo wake (carga {avg_actual:.1f}%).')
+        print(f'REATIVO: carga real {avg_actual:.1f}% > {lim_max}%. Acordando {reactive_host}...')
+        event_logger.logger.log(Event(
+            timestamp=datetime.now().isoformat(),
+            event_type='wake',
+            hostname=reactive_host,
+            trigger_type='reactive',
+            ram_avg=avg_actual,
+            lim_max=lim_max,
+            lim_med=lim_med,
+            running_hosts=len(running),
+            idle_hosts=len(idle),
+            offline_hosts=len(offline),
+            predicted_ram=avg_predicted,
+            actual_ram=avg_actual
+        ))
+        changestate.wake(reactive_host)
 
     # HIGH LOAD but cannot add capacity: keep idle hosts to absorb load (never shut down under high load)
     elif avg_actual > lim_max:
@@ -513,15 +462,11 @@ def run(lim_max, lim_med, predict_model):
             print(f'Carga alta ({avg_actual:.1f}%) — sem idle/offline: {_fmt(running)} — limite de capacidade.')
     else:
         if len(idle) > 0:
-            if ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
-                # Filter out hosts in wake grace (recently woken -> protect from shutdown)
-                idle_ok = [h for h in idle if not is_in_wake_grace(h)]
-                grace_hosts = [h for h in idle if is_in_wake_grace(h)]
-                for h in grace_hosts:
-                    remaining = config.WAKE_GRACE_SECONDS - (time.time() - wake_times[h])
-                    print(f'[WAKE GRACE] {h} protegido por {remaining:.0f}s (wake recente)')
-                # Keep at least 1 host (either not in grace or the first one)
-                shutdown_candidates = idle_ok[:-1] if len(idle_ok) > 1 else []
+            if _vms_rising():
+                print(f'Idle {_fmt(idle)} mantido — nº de VMs subindo (carga a caminho).')
+            elif ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
+                # Keep at least 1 host
+                shutdown_candidates = idle[:-1] if len(idle) > 1 else []
                 for host in shutdown_candidates:	# Turn off all except 1
                     reason = ''
                     ds = host_metrics.secs_since_delete(host)
@@ -543,12 +488,7 @@ def run(lim_max, lim_med, predict_model):
                     shutdown_host(host)
             else:
                 if len(running) >= 1:		## If there is at least 1 active host
-                    idle_ok = [h for h in idle if not is_in_wake_grace(h)]
-                    grace_hosts = [h for h in idle if is_in_wake_grace(h)]
-                    for h in grace_hosts:
-                        remaining = config.WAKE_GRACE_SECONDS - (time.time() - wake_times[h])
-                        print(f'[WAKE GRACE] {h} protegido por {remaining:.0f}s (wake recente)')
-                    for host in idle_ok:
+                    for host in idle:
                         reason = ''
                         ds = host_metrics.secs_since_delete(host)
                         if ds < config.IDLE_DELETE_RECENCY_S:
@@ -568,13 +508,8 @@ def run(lim_max, lim_med, predict_model):
                         ))
                         shutdown_host(host)		# shut down all idle hosts
                 else:								# Else...
-                    idle_ok = [h for h in idle if not is_in_wake_grace(h)]
-                    grace_hosts = [h for h in idle if is_in_wake_grace(h)]
-                    for h in grace_hosts:
-                        remaining = config.WAKE_GRACE_SECONDS - (time.time() - wake_times[h])
-                        print(f'[WAKE GRACE] {h} protegido por {remaining:.0f}s (wake recente)')
-                    # Keep at least 1 host (either not in grace or the first one)
-                    shutdown_candidates = idle_ok[:-1] if len(idle_ok) > 1 else []
+                    # Keep at least 1 host
+                    shutdown_candidates = idle[:-1] if len(idle) > 1 else []
                     for host in shutdown_candidates:	# Turn off all except 1
                         reason = ''
                         ds = host_metrics.secs_since_delete(host)

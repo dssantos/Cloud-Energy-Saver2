@@ -127,7 +127,6 @@ class ExperimentOrchestrator:
 			offline.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
 			target = offline[0]
 			print(f'   [RECOVERY] {failed_vm} falhou e nenhum host up tem < {config.MAX_VMS_PER_HOST} VMs. Acordando {target}...')
-			verifier.wake_times[target] = time.time()
 			changestate.wake(target)
 		except Exception as e:
 			print(f'   [RECOVERY ERROR] {e}')
