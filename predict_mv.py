@@ -36,6 +36,8 @@ with redirect_stderr(_stderr):
     import keras.optimizers
     import pandas as pd
 
+import config
+
 MV_DIR = 'workload_mv'
 MODEL_DIR = 'models_mv'
 
@@ -482,7 +484,7 @@ class MVLSTMTrainingManager:
                     continue
                 model, mn, mx, n_steps = loaded
                 r = _recent_error(hostname, model, mn, mx, n_steps,
-                                  steps_ahead=2, max_windows=RE_EVAL_WINDOWS)
+                                  steps_ahead=config.STEPS_AHEAD, max_windows=RE_EVAL_WINDOWS)
                 if r is not None:
                     self.record_eval(hostname, filename, r[0], r[1])
         except Exception as e:
@@ -512,7 +514,7 @@ class MVLSTMTrainingManager:
     def _training_loop(self, hostname):
         while not self._stop_event.is_set():
             try:
-                filename = train_lstm_model_mv(hostname, steps_ahead=2)
+                filename = train_lstm_model_mv(hostname, steps_ahead=config.STEPS_AHEAD)
                 if filename:
                     with self._cache_lock:
                         self._cache.pop(hostname, None)  # new model competes next cycle

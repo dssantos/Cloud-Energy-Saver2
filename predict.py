@@ -36,6 +36,7 @@ with redirect_stderr(stderr_capture):
     import keras.optimizers
 
 import workload, ram_usage
+import config
 
 
 def naive(hostname):
@@ -443,7 +444,7 @@ class LSTMTrainingManager:
                 # This allows training even when data has gaps that create smaller segments
                 if len(df) > 100:
                     print(f'[TRAINING LOOP] {hostname}: Condições atendidas - df: {len(df)} (last_df: {len(last_df)})')
-                    model = train_lstm_model(hostname, steps_ahead=2)
+                    model = train_lstm_model(hostname, steps_ahead=config.STEPS_AHEAD)
 
                     if model:
                         # Validate prediction quality

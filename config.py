@@ -33,7 +33,7 @@ LIM_MAX = 70.0
 LIM_MED = 30.0
 
 # --- Predição ---
-STEPS_AHEAD = 2  # 1 min à frente (já é o default em predict.py / verifier.py)
+STEPS_AHEAD = 6  # 3 min à frente (cadência de coleta de 30s; era 2 = 1 min)
 MAX_VMS_PER_HOST = 10  # host "cheio" com >= N VMs; usado na recuperação por falha de alocação
 
 # --- SLA ---
