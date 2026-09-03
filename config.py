@@ -33,7 +33,7 @@ LIM_MAX = 70.0
 LIM_MED = 30.0
 
 # --- Predição ---
-STEPS_AHEAD = 6  # 3 min à frente (cadência de coleta de 30s; era 2 = 1 min)
+STEPS_AHEAD = 4  # 2 min à frente (cadência de coleta de 30s; era 6 = 3 min)
 GAP_S = 90       # espaçamento máx. entre amostras de workload (s); >90s = 2+ amostras perdidas (crash/travamento)
 MAX_VMS_PER_HOST = 10  # host "cheio" com >= N VMs; usado na recuperação por falha de alocação
 
