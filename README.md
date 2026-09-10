@@ -166,3 +166,13 @@ python orchestrator.py --instantiator-only --num-vms 27
 - **arima**: ARIMA(1,0,1) model fitted to workload history
 - **lstm**: LSTM neural network with continuous background training
 
+## Experiment data
+
+The [`experiments/`](experiments/) directory holds the data from executed runs that compare the
+**three execution modes** — baseline (no verifier), default (reactive CES2) and LSTM (predictive
+CES2) — under identical load and an aligned time window. Each run folder contains the cluster
+workload series, the decision events, the model scoreboard and the comparative analysis output.
+
+See [`experiments/README.md`](experiments/README.md) for how to reproduce a run and for a
+description of each field produced by the analysis.
+

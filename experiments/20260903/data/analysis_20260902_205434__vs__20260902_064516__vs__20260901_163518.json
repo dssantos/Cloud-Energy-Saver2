@@ -1,0 +1,19 @@
+{
+  "window": {
+    "start": "2026-09-02 20:54:39",
+    "duration_hours": 13.997
+  },
+  "late_shutdown_reactive_min": 10.4,
+  "late_shutdown_lstm_min": 6.37,
+  "baseline_hours": 41.992,
+  "reactive_hours": 28.62,
+  "lstm_active_hours": 33.556,
+  "default_saved_pct": 31.84,
+  "lstm_saved_pct": 20.09,
+  "energy_kwh_baseline": 3.8843,
+  "energy_kwh_default": 2.6473,
+  "energy_kwh_lstm": 3.1039,
+  "sla_episodes_baseline": 0,
+  "sla_episodes_reactive": 435,
+  "sla_episodes_lstm": 154
+}

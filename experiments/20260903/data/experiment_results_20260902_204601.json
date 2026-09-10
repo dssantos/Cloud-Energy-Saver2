@@ -1,0 +1,2850 @@
+{
+  "start_time": "2026-09-02T06:44:54.021654",
+  "end_time": "2026-09-02T20:45:57.202014",
+  "hosts_waked": [
+    "controller",
+    "compute1",
+    "compute2",
+    "compute3"
+  ],
+  "hosts_registered": [],
+  "vms_created": [
+    {
+      "vm_name": "vm-1",
+      "server_id": "47e52424-ad26-454e-8132-570decbbb00c",
+      "allocated": true,
+      "allocation_time": 14.560141563415527,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:46:35.553002"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "2404dc2c-ddc2-45b4-9ae2-70af63df70ec",
+      "allocated": true,
+      "allocation_time": 17.365646839141846,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:47:53.940752"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "b79ee8d5-ba8e-4a09-bd4c-542f82db87fe",
+      "allocated": true,
+      "allocation_time": 16.36169958114624,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:49:11.324162"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "8986ffa2-cff5-4a8c-87e2-6ee0372b97db",
+      "allocated": true,
+      "allocation_time": 14.139891624450684,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:50:26.485702"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "3b961e70-f72b-4740-aaa1-95748c82f35a",
+      "allocated": true,
+      "allocation_time": 14.749533891677856,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:51:42.257055"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "9bc04115-bfa6-4edf-8863-c3f914888223",
+      "allocated": true,
+      "allocation_time": 14.120543479919434,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:52:57.398583"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "572e71d8-2e20-4297-ac07-3ad127d2b808",
+      "allocated": true,
+      "allocation_time": 14.873894214630127,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:54:13.293759"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "149b7318-c270-40f4-aefa-b00a350c5560",
+      "allocated": true,
+      "allocation_time": 14.414305686950684,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:55:28.729749"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "b8fcef9a-c5db-4040-9355-ca625a789cd9",
+      "allocated": true,
+      "allocation_time": 14.797768831253052,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:56:44.549312"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "9f70919a-a4a9-4b56-bd80-5f81f8ee6c4a",
+      "allocated": true,
+      "allocation_time": 16.72622323036194,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:58:02.297353"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "8707dd7d-0936-4da2-a700-c2571eebbc6c",
+      "allocated": true,
+      "allocation_time": 14.510103702545166,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T06:59:17.829900"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "66811a3c-18f5-4e69-85e0-e6feb7c3177a",
+      "allocated": true,
+      "allocation_time": 15.693749904632568,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:00:34.770780"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "c340e067-ba15-48b4-aaa1-a16e1b2170d5",
+      "allocated": true,
+      "allocation_time": 14.922595024108887,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:01:50.715350"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "29dd676f-6d22-4dde-b669-7c83ea510790",
+      "allocated": true,
+      "allocation_time": 14.521966695785522,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:03:06.258718"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "8410b38d-9c15-432b-8769-d3a935d8328a",
+      "allocated": true,
+      "allocation_time": 14.853035688400269,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:04:22.133416"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "878581ca-7292-428d-921d-08dc05714909",
+      "allocated": true,
+      "allocation_time": 14.56533145904541,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:05:37.721098"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "ca77bf00-5ab1-40fb-a211-7de289f241f9",
+      "allocated": true,
+      "allocation_time": 14.948764562606812,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:06:53.691003"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "226b893d-cf22-4122-baa4-29a26d940ea8",
+      "allocated": true,
+      "allocation_time": 15.357231378555298,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:08:10.069999"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "91aafb2d-51c2-4902-8bb1-924e1fc8b280",
+      "allocated": true,
+      "allocation_time": 15.681121826171875,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:09:26.772202"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "8444a9b2-1868-4474-8b57-a9da90ebfaee",
+      "allocated": true,
+      "allocation_time": 14.867026567459106,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:10:42.660846"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "217fb89a-accb-4097-b385-4a27091f4089",
+      "allocated": true,
+      "allocation_time": 15.50851035118103,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:11:59.190510"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "242b8534-70a8-4f54-a44a-c7d394c5d0a9",
+      "allocated": true,
+      "allocation_time": 15.039761781692505,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:13:15.251992"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "6d0da087-e8e5-4498-9376-3a78d6f00f68",
+      "allocated": true,
+      "allocation_time": 17.298232793807983,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:14:33.571776"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "2ae231d9-f4cc-4b68-9931-09fe0ed1fe4d",
+      "allocated": true,
+      "allocation_time": 14.54375433921814,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:15:49.137492"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "91318774-3f35-4489-a686-81499a562d01",
+      "allocated": true,
+      "allocation_time": 15.465449571609497,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:17:05.629765"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "3a774104-b67d-4b07-bf72-1fb5d3ab4566",
+      "allocated": true,
+      "allocation_time": 15.041640996932983,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:18:21.694778"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "58bc6504-4d8a-4e26-9a87-52b360b74148",
+      "allocated": true,
+      "allocation_time": 15.708453178405762,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:19:38.424700"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "15ace951-72eb-4cc9-8048-6534a2c6989c",
+      "allocated": true,
+      "allocation_time": 14.213968992233276,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:53:22.495077"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "e4db0612-7ae3-4ecd-9d72-3c9b13b42475",
+      "allocated": true,
+      "allocation_time": 13.791923761367798,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:54:37.308942"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "c98c36bb-b028-48c2-b448-52b47bd3c1b8",
+      "allocated": true,
+      "allocation_time": 14.86497950553894,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:55:53.195815"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "eaec03b2-6db6-47f7-9334-1ac561d64dd7",
+      "allocated": true,
+      "allocation_time": 14.938737154006958,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:57:09.155970"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "f1de327c-e0e7-4b69-9cc6-4526d3b840ba",
+      "allocated": true,
+      "allocation_time": 13.902273178100586,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:58:24.080459"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "d24464ad-f44f-46b5-8e95-408b62f06a7a",
+      "allocated": true,
+      "allocation_time": 15.034070491790771,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T07:59:40.135836"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "d472659a-f823-4e6a-9d56-4ade5c775d58",
+      "allocated": true,
+      "allocation_time": 14.51828670501709,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:00:55.675809"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "54681b21-5a5b-4ee9-aeb7-e32f538d74c9",
+      "allocated": true,
+      "allocation_time": 14.17909049987793,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:02:10.876510"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "bd80b308-a483-4cbc-8c5f-ad3befe59794",
+      "allocated": true,
+      "allocation_time": 14.701595067977905,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:03:26.600409"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "5f148ef5-657d-4833-8459-498b5ed39d18",
+      "allocated": true,
+      "allocation_time": 14.603008031845093,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:04:42.227338"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "27500086-8248-471b-a58e-bccb82aed180",
+      "allocated": true,
+      "allocation_time": 15.103829860687256,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:05:58.352950"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "a6e7b657-56f3-4c59-aac1-3f52ab5211b4",
+      "allocated": true,
+      "allocation_time": 14.184038639068604,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:07:13.559476"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "4b28ed1a-0247-4108-a103-2a2382b09562",
+      "allocated": true,
+      "allocation_time": 15.261617183685303,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:08:29.842728"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "97f7e000-323f-4fff-9347-31e4efb47961",
+      "allocated": true,
+      "allocation_time": 14.45730447769165,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:09:45.321459"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "4a42a88b-7a3d-4fb9-91de-8a9c1ccf3db1",
+      "allocated": true,
+      "allocation_time": 15.08720088005066,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:11:01.429915"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "99772afb-f7b4-4667-88ae-61e6f2eb218b",
+      "allocated": true,
+      "allocation_time": 15.2722806930542,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:12:17.726788"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "1fd876e3-552d-4019-960c-95732d4e0c71",
+      "allocated": true,
+      "allocation_time": 15.624715805053711,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:13:34.373520"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "dfbed66b-2ffb-4e7a-8967-7e23dbffc867",
+      "allocated": true,
+      "allocation_time": 14.341566562652588,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:14:49.736059"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "e489354d-ddd7-4bc3-ba2b-0a55025fd0d1",
+      "allocated": true,
+      "allocation_time": 15.882637977600098,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:16:06.640129"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "fb5bbafd-c4c0-4a3d-b495-d6b431b9c6a1",
+      "allocated": true,
+      "allocation_time": 15.79093623161316,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:17:23.451839"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "1651da78-2bc7-4312-9089-df83de327c5c",
+      "allocated": true,
+      "allocation_time": 16.37556552886963,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:18:40.849361"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "61946052-c7a7-4567-bc76-7d33bf9d32af",
+      "allocated": true,
+      "allocation_time": 14.245309829711914,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:19:56.115288"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "d9a2e332-3f69-4b97-ae0e-e5625cdc5aa4",
+      "allocated": true,
+      "allocation_time": 15.855234861373901,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:21:12.992023"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "18fc96b1-8820-452d-aba4-5b8dd6be0c28",
+      "allocated": true,
+      "allocation_time": 16.2366464138031,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:22:30.250808"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "ca84b9e2-f9c4-493c-b553-272db856dc31",
+      "allocated": true,
+      "allocation_time": 15.736167907714844,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:23:47.011113"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "7438e72c-39bd-4398-8b11-82953cf668af",
+      "allocated": true,
+      "allocation_time": 15.803465843200684,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:25:03.836849"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "77e69613-7467-496c-adc8-5ba44f24dd9d",
+      "allocated": true,
+      "allocation_time": 15.283444166183472,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T08:26:20.141936"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "2fcd7646-9210-4fc5-bac8-e8347e3184ac",
+      "allocated": true,
+      "allocation_time": 15.404632568359375,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:00:21.344395"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "108108fe-b422-4b2d-a707-b4ed6c1a24a7",
+      "allocated": true,
+      "allocation_time": 14.513001203536987,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:01:36.880750"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "e64af36b-a699-4756-88e5-ff2fefa0a48f",
+      "allocated": true,
+      "allocation_time": 13.887382507324219,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:02:51.792191"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "6be602e3-cbde-43ea-aac1-96ba382685d4",
+      "allocated": true,
+      "allocation_time": 14.363430500030518,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:04:07.177379"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "8478c248-7c19-471a-9b7d-e2ceb5537b14",
+      "allocated": true,
+      "allocation_time": 15.040771484375,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:05:23.239485"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "4ec2f039-6250-4e28-8240-bb97f07ac286",
+      "allocated": true,
+      "allocation_time": 14.238561153411865,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:06:38.500343"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "1f9d212d-7c88-4162-b089-a96d8daf6c0d",
+      "allocated": true,
+      "allocation_time": 13.938149690628052,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:07:53.459922"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "ddf8176d-2dae-4f3e-8072-dda53ad16af3",
+      "allocated": true,
+      "allocation_time": 14.421285152435303,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:09:08.907772"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "592bff93-cd2d-4a47-b9f8-ebe480a688cd",
+      "allocated": true,
+      "allocation_time": 14.639610528945923,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:10:24.570215"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "87f851c0-1f92-4c78-a1ec-ccffea28585b",
+      "allocated": true,
+      "allocation_time": 15.995399713516235,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:11:41.587159"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "36fb56d4-1715-4c19-b78e-45d2cd759adf",
+      "allocated": true,
+      "allocation_time": 14.582784175872803,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:12:57.192003"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "e3d40da6-ae07-4fe0-a73d-212a0acca5b1",
+      "allocated": true,
+      "allocation_time": 14.48230767250061,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:14:12.695776"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "1d875f45-3051-4a15-bd75-2d6f73ae738a",
+      "allocated": true,
+      "allocation_time": 15.241347789764404,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:15:28.962103"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "053a0cf5-ae7f-4df1-a6d5-de1d9ad7d534",
+      "allocated": true,
+      "allocation_time": 15.234588861465454,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:16:45.218548"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "1e4ebe3e-ef08-4476-ac3a-cd7d01c584b0",
+      "allocated": true,
+      "allocation_time": 14.75688099861145,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:18:01.000676"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "45413a8d-ca56-4a7e-9bea-f249ba74a420",
+      "allocated": true,
+      "allocation_time": 15.250720977783203,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:19:17.273078"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "92643003-3163-4e12-b43a-da10e60bbd22",
+      "allocated": true,
+      "allocation_time": 15.217652797698975,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:20:33.512405"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "ceea7d69-311d-45d3-9eba-f71dd3d1942a",
+      "allocated": true,
+      "allocation_time": 14.901228666305542,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:21:49.434989"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "2c3385dd-d5c6-44d4-aa23-4705506bbff7",
+      "allocated": true,
+      "allocation_time": 16.519665718078613,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:23:06.976007"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "5aa9e553-e56a-4d61-8554-0d7f3727e73f",
+      "allocated": true,
+      "allocation_time": 15.391034603118896,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:24:23.389475"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "f74b9a3b-f54a-4a8b-83e6-3502ead72655",
+      "allocated": true,
+      "allocation_time": 15.842986345291138,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:25:40.254736"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "5067814d-f156-4cea-a8a0-04ff6dc23f60",
+      "allocated": true,
+      "allocation_time": 14.323509454727173,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:26:55.598916"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "14fd776d-849d-4910-9cfe-a0844d68aafc",
+      "allocated": true,
+      "allocation_time": 14.599782705307007,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:28:11.220485"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "279fcf21-8d4c-4d43-ad96-6a0ba97d0ab4",
+      "allocated": true,
+      "allocation_time": 16.24919843673706,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:29:28.491656"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "e60fbc12-1cc2-44c0-80dd-5ab25ab2eb14",
+      "allocated": true,
+      "allocation_time": 15.506374597549438,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:30:45.018677"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "b12f5998-5d8f-42e0-bfe2-73787114f35f",
+      "allocated": true,
+      "allocation_time": 16.017953157424927,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:32:02.060825"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "6c07cd8a-069c-4bea-a612-722d389ff35d",
+      "allocated": true,
+      "allocation_time": 14.88091492652893,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T09:33:17.962879"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "66ff6286-bd07-4ab6-8d85-87702078fafe",
+      "allocated": true,
+      "allocation_time": 15.353644132614136,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:07:05.518991"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "0f43140a-c294-4cac-b123-9eb90e470b71",
+      "allocated": true,
+      "allocation_time": 14.176971673965454,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:08:20.717108"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "320c35cf-a535-4617-8b59-a9003e9a7f14",
+      "allocated": true,
+      "allocation_time": 14.09762167930603,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:09:35.836765"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "cacb494e-90b3-4666-a9c4-76749f920e3a",
+      "allocated": true,
+      "allocation_time": 15.118120670318604,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:10:51.976893"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "9ec82ce5-2b39-4f94-9b5c-78fb198bb408",
+      "allocated": true,
+      "allocation_time": 14.930330514907837,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:12:07.929154"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "52cea42e-5e2a-4b03-8a46-c2bf59f7eb8b",
+      "allocated": true,
+      "allocation_time": 14.228843450546265,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:13:23.180144"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "978d240d-d316-4eca-9436-8b06ca9bea16",
+      "allocated": true,
+      "allocation_time": 14.251128435134888,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:14:38.453324"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "8ae71ad9-e67f-4617-b97b-6b0d6a6246d2",
+      "allocated": true,
+      "allocation_time": 14.26496148109436,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:15:53.740132"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "85a80797-7115-4acf-893f-939b66a91afe",
+      "allocated": true,
+      "allocation_time": 14.337343692779541,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:17:09.100142"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "1a566744-3448-4c5e-9e10-8905420e042d",
+      "allocated": true,
+      "allocation_time": 14.859647750854492,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:18:24.982913"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "8da2bd5f-a413-4105-b875-724e96abcb97",
+      "allocated": true,
+      "allocation_time": 14.18713641166687,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:19:40.194465"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "c4822f54-3ddd-4aac-94a4-cb9dce2433fb",
+      "allocated": true,
+      "allocation_time": 15.043139219284058,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:20:56.258942"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "873caba6-337d-4d65-82b4-c34e48aa42e5",
+      "allocated": true,
+      "allocation_time": 14.25455927848816,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:22:11.536431"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "5d929a46-921e-4395-8d90-a1b8d9a6623e",
+      "allocated": true,
+      "allocation_time": 15.449753046035767,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:23:28.008092"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "83e288e3-18e1-40da-99b2-44b927266103",
+      "allocated": true,
+      "allocation_time": 15.143031597137451,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:24:44.176114"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "8c6019ee-d41b-4a10-babd-c872c4de9979",
+      "allocated": true,
+      "allocation_time": 15.16744351387024,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:26:00.365265"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "b9e835ca-93f9-42cb-bcb1-026ff0dfd059",
+      "allocated": true,
+      "allocation_time": 14.899042129516602,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:27:16.286228"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "5baeae41-acc0-42c9-afe2-5b18e3b0e0b4",
+      "allocated": true,
+      "allocation_time": 14.312236309051514,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:28:31.620156"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "8c1556a8-9892-49c0-8174-637fd08e269c",
+      "allocated": true,
+      "allocation_time": 16.527934789657593,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:29:49.171022"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "60ab6887-07ed-4677-916d-4748d164a4ee",
+      "allocated": true,
+      "allocation_time": 15.89051604270935,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:31:06.084988"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "ebc71a9c-8840-4f6a-8e13-c40d841f3c43",
+      "allocated": true,
+      "allocation_time": 15.433822393417358,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:32:22.540305"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "367d3995-8fa3-4ffb-86e4-5466198bd963",
+      "allocated": true,
+      "allocation_time": 14.93068552017212,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:33:38.494540"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "1cf8addb-5952-4119-8826-9e2db0162e1c",
+      "allocated": true,
+      "allocation_time": 15.214646100997925,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:34:54.730660"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "686283e1-30bd-440b-b36f-d1a5053ea178",
+      "allocated": true,
+      "allocation_time": 14.817920923233032,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:36:10.569665"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "30dbede9-22da-4b08-acaa-de7d1dabbf92",
+      "allocated": true,
+      "allocation_time": 15.211246967315674,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:37:26.802458"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "c23147e2-6b3b-4acd-a3bd-3eead2c31001",
+      "allocated": true,
+      "allocation_time": 15.16758680343628,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:38:42.992294"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "f34da09b-371e-48b9-abb2-3e641f664a18",
+      "allocated": true,
+      "allocation_time": 13.872551679611206,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T10:39:57.886108"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "df4d031b-b2a4-40cb-9910-c8a928633005",
+      "allocated": true,
+      "allocation_time": 15.04056167602539,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:13:42.524319"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "7f9497a3-f3b2-42c0-a277-dca05bbb828a",
+      "allocated": true,
+      "allocation_time": 14.464323282241821,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:14:58.010514"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "9e6c6756-69f1-47eb-aa67-0971410f7822",
+      "allocated": true,
+      "allocation_time": 14.000853300094604,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:16:13.034264"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "bb57c774-de86-4597-bf8d-2dfecbce0ace",
+      "allocated": true,
+      "allocation_time": 14.479854345321655,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:17:28.535825"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "ad9f4d81-4eef-4ab0-b9c9-c93fb37c7309",
+      "allocated": true,
+      "allocation_time": 14.471944093704224,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:18:44.032963"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "22d98600-42f2-41ff-a555-566343890282",
+      "allocated": true,
+      "allocation_time": 13.863743543624878,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:19:58.919306"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "b7fdfe47-d09c-4fa2-a408-78cd918e3317",
+      "allocated": true,
+      "allocation_time": 14.649688720703125,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:21:14.591153"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "d397bf54-9422-4472-bf4e-8c7a194edd10",
+      "allocated": true,
+      "allocation_time": 14.51271104812622,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:22:30.125861"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "d133a2e4-9175-4086-83d8-872105d25927",
+      "allocated": true,
+      "allocation_time": 14.397514581680298,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:23:45.545550"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "81608fee-5181-4834-a4be-b5537cc434be",
+      "allocated": true,
+      "allocation_time": 15.851835012435913,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:25:02.419405"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "5bd4b27d-e572-42b5-b70f-f39416beb019",
+      "allocated": true,
+      "allocation_time": 15.0522301197052,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:26:18.493660"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "073dd434-addc-42c3-b9bb-8064a03f2cf1",
+      "allocated": true,
+      "allocation_time": 14.63335657119751,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:27:34.149219"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "dd2fba95-0295-48d5-810a-1842b1541b88",
+      "allocated": true,
+      "allocation_time": 15.560118436813354,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:28:50.730994"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "ede06423-ee8a-4d05-b8b4-9bb13966547f",
+      "allocated": true,
+      "allocation_time": 14.155280113220215,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:30:05.907776"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "bb320282-42be-4546-b910-27060b80a7aa",
+      "allocated": true,
+      "allocation_time": 14.938237190246582,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:31:21.867469"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "9f9796a6-a98f-40af-8ddc-998708833eb1",
+      "allocated": true,
+      "allocation_time": 14.302863121032715,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:32:37.191671"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "0dde76da-2798-4569-9c75-cdcbe8f9e28c",
+      "allocated": true,
+      "allocation_time": 15.331220388412476,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:33:53.545233"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "1c8f7ed1-a823-4d6a-b643-157940211e57",
+      "allocated": true,
+      "allocation_time": 15.04731798171997,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:35:09.614085"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "d6b923d9-a309-4cbf-9467-ee9f4c6da91c",
+      "allocated": true,
+      "allocation_time": 15.591041088104248,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:36:26.226389"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "159d9f46-f4db-4cbc-93d5-675b12be1b0b",
+      "allocated": true,
+      "allocation_time": 14.833784103393555,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:37:42.081463"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "3fbda4d3-9631-469f-b631-931137ba1044",
+      "allocated": true,
+      "allocation_time": 16.85721778869629,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:38:59.959353"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "6a9baf68-1b37-41d6-a63d-ba0d510a40b6",
+      "allocated": true,
+      "allocation_time": 14.74303388595581,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:40:15.724620"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "3150f7e2-2b90-402a-86ca-f9c4a8b62022",
+      "allocated": true,
+      "allocation_time": 16.37781810760498,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:41:33.125314"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "8257e331-9a0e-4d7c-a246-d359a2809cd9",
+      "allocated": true,
+      "allocation_time": 14.7300705909729,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:42:49.311009"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "6c1f49a6-5b7e-4593-bf98-bb6013a43db6",
+      "allocated": true,
+      "allocation_time": 15.245126724243164,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:44:05.582462"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "82d26281-e354-4507-8bf8-5179cc603a0a",
+      "allocated": true,
+      "allocation_time": 14.572600603103638,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:45:21.177638"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "67c0fa66-d2e9-4cc4-b22a-6d957887a09a",
+      "allocated": true,
+      "allocation_time": 15.557930707931519,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T11:46:37.757450"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "6e88d917-d9a6-491d-b27b-ec635d8fdd40",
+      "allocated": true,
+      "allocation_time": 14.853142976760864,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:20:21.295018"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "ada0336b-01ae-4e48-b7ac-c08c6fb4862b",
+      "allocated": true,
+      "allocation_time": 13.896077632904053,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:21:36.213188"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "cf3dfb4d-129a-43f1-8a06-0c745786f8b3",
+      "allocated": true,
+      "allocation_time": 13.387382745742798,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:22:50.622796"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "dc8cb32c-cfc0-414c-a805-e5a3b53d98e9",
+      "allocated": true,
+      "allocation_time": 14.511362314224243,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:24:06.183768"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "33feb5e7-42bf-4461-af0d-dbea73f5bcfc",
+      "allocated": true,
+      "allocation_time": 14.53235411643982,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:25:21.739674"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "54fbbd65-76fb-427a-80ee-6ad76dc6e0be",
+      "allocated": true,
+      "allocation_time": 14.190735340118408,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:26:36.952490"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "802b5892-adf3-4377-8e46-622776cf1d1a",
+      "allocated": true,
+      "allocation_time": 19.138611555099487,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:27:57.113104"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "c50fdb55-d61c-4b7c-9089-c4a0a01556d0",
+      "allocated": true,
+      "allocation_time": 16.898690938949585,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:29:15.034098"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "c43514a8-6fa4-4c3e-a057-add808c2103b",
+      "allocated": true,
+      "allocation_time": 13.97063946723938,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:30:30.027148"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "c3ca8205-75f0-4be6-978f-edbf7f256248",
+      "allocated": true,
+      "allocation_time": 14.63291049003601,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:31:45.683126"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "1ebcbcca-4ccc-4d9c-a5a1-e0e05d9b03ff",
+      "allocated": true,
+      "allocation_time": 16.21801781654358,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:33:02.927307"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "8af7b00e-1434-40aa-aa73-ce2961a6a796",
+      "allocated": true,
+      "allocation_time": 14.379137754440308,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:34:18.328175"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "9e81a201-eb82-485a-b1f2-89ed8c3279b8",
+      "allocated": true,
+      "allocation_time": 14.366856098175049,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:35:33.716503"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "94c43786-39b7-4c57-b0d2-07e589c5d2a8",
+      "allocated": true,
+      "allocation_time": 15.01123309135437,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:36:49.749974"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "2fbab77c-605b-45c4-98f3-1449214fa9a1",
+      "allocated": true,
+      "allocation_time": 15.420864582061768,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:38:06.193236"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "f938796d-d37c-4195-a5bd-70dee399b452",
+      "allocated": true,
+      "allocation_time": 15.5702064037323,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:39:22.785812"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "98ed8501-f970-4ffc-90a0-f8e8a25240b6",
+      "allocated": true,
+      "allocation_time": 14.560965061187744,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:40:38.368710"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "5eed51cc-bd91-4d29-90eb-cf2e50ce517e",
+      "allocated": true,
+      "allocation_time": 15.601167678833008,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:41:54.990480"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "44f0b8f1-f57e-47b7-a516-dcb6c220030c",
+      "allocated": true,
+      "allocation_time": 16.09781813621521,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:43:12.109649"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "5c4b0578-194a-461d-ae8f-c10294beba2f",
+      "allocated": true,
+      "allocation_time": 15.296949863433838,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:44:28.428937"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "306fe4b0-1086-4fd7-8d81-35576b54a5a0",
+      "allocated": true,
+      "allocation_time": 16.180060386657715,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:45:45.631207"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "b26782f7-c153-468f-bfac-cf2f0cbbbf5a",
+      "allocated": true,
+      "allocation_time": 15.000752449035645,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:47:01.653810"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "ac63de42-4dc9-43ec-af43-5d0dc287a180",
+      "allocated": true,
+      "allocation_time": 15.673781394958496,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:48:18.349338"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "fde1b9b6-fc26-4d50-ab7c-bc3a5e2480d1",
+      "allocated": true,
+      "allocation_time": 14.94632887840271,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:49:34.320436"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "3852e6a1-b05d-433f-9367-1fe6f93783d0",
+      "allocated": true,
+      "allocation_time": 16.232478857040405,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:50:51.574028"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "4ef79941-5e78-4d26-8bdb-b93f8f394eb1",
+      "allocated": true,
+      "allocation_time": 16.482534408569336,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:52:09.088092"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "13261a31-b631-4097-ab34-bc02526b1703",
+      "allocated": true,
+      "allocation_time": 14.910031080245972,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T12:53:25.019747"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "b12d60b4-2d3b-4ba1-b861-1d256eb52bec",
+      "allocated": true,
+      "allocation_time": 15.336443662643433,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:27:08.115221"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "90dae422-dd65-4cd4-836e-85dab6b8071d",
+      "allocated": true,
+      "allocation_time": 14.785552024841309,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:28:23.922507"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "6bf441f4-e745-41b8-922c-ec28e627b2dd",
+      "allocated": true,
+      "allocation_time": 14.183102130889893,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:29:39.127155"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "ec9cfc72-4b15-455f-a49f-406280424de5",
+      "allocated": true,
+      "allocation_time": 14.159987926483154,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:30:54.308250"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "38a173a6-7c53-469d-9aa5-0947f0892943",
+      "allocated": true,
+      "allocation_time": 13.937685251235962,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:32:09.267932"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "24bc86a3-5f65-4d09-855c-94c4544c6908",
+      "allocated": true,
+      "allocation_time": 14.01735258102417,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:33:24.306814"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "080ad644-22c4-4a8c-8c25-98e45513c19f",
+      "allocated": true,
+      "allocation_time": 14.676291704177856,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:34:40.003868"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "0162afbd-c08a-4698-baa9-fb1633176d74",
+      "allocated": true,
+      "allocation_time": 14.626910209655762,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:35:55.652263"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "7b1ee8db-f0b0-4ab1-9ca8-c5cfd937e42d",
+      "allocated": true,
+      "allocation_time": 15.412296295166016,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:37:12.086489"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "c2c17cd1-716c-440f-be65-7ade322fc088",
+      "allocated": true,
+      "allocation_time": 14.58477783203125,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:38:27.693189"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "4828ca02-5ede-4e41-a75b-e3e939080601",
+      "allocated": true,
+      "allocation_time": 14.273740291595459,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:39:42.988515"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "bd29cd79-fffa-42c7-8abc-6f2187231a72",
+      "allocated": true,
+      "allocation_time": 14.98062014579773,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:40:58.990808"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "c13dcae4-7f48-4483-9975-51e412b8ad0c",
+      "allocated": true,
+      "allocation_time": 15.25298547744751,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:42:15.266351"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "15f75eff-7363-4377-b2ed-ffda3658ae52",
+      "allocated": true,
+      "allocation_time": 14.521933555603027,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:43:30.810113"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "bda282d8-dc27-480e-bef5-eb64ffe6f29f",
+      "allocated": true,
+      "allocation_time": 14.513094902038574,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:44:46.344698"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "5b9c334b-61e7-412a-ad08-23649ce2e227",
+      "allocated": true,
+      "allocation_time": 14.757503509521484,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:46:02.134280"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "2751d9fd-a7c9-4bff-bc34-9ec5ebbbce47",
+      "allocated": true,
+      "allocation_time": 14.829859256744385,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:47:17.985969"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "fb37d52c-1ccb-4332-bfa2-2aba92fc6cad",
+      "allocated": true,
+      "allocation_time": 16.800280809402466,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:48:35.806992"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "eb882845-6625-461f-9cc2-2905583f138a",
+      "allocated": true,
+      "allocation_time": 15.541831731796265,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:49:52.369267"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "a330a41c-60f7-44d1-b3b2-9b80bd675be9",
+      "allocated": true,
+      "allocation_time": 15.550769567489624,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:51:08.941549"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "d342fa46-026b-4628-bb43-a7b9aab5ef09",
+      "allocated": true,
+      "allocation_time": 14.784424781799316,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:52:24.747195"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "bd8c5635-2120-478e-9ee9-95d54e35d977",
+      "allocated": true,
+      "allocation_time": 15.024292707443237,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:53:40.793104"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "7203cf7b-55ec-4d35-b7c2-591eb9483f75",
+      "allocated": true,
+      "allocation_time": 15.715374231338501,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:54:57.529840"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "fa889a7f-c718-4c6c-b8b5-bcebfa81f570",
+      "allocated": true,
+      "allocation_time": 15.235491752624512,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:56:13.787061"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "b38a436f-0f18-4efb-9be2-b920e11aa558",
+      "allocated": true,
+      "allocation_time": 15.7714684009552,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:57:30.580650"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "560255f7-c826-44a0-9920-8a8aa3ce0760",
+      "allocated": true,
+      "allocation_time": 14.750948190689087,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T13:58:46.353040"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "bd3de88a-5705-4170-a331-6349e7c0c83e",
+      "allocated": true,
+      "allocation_time": 16.21281909942627,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:00:03.587227"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "10089e54-0292-4092-b446-013c93190a74",
+      "allocated": true,
+      "allocation_time": 14.931720733642578,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:33:49.422212"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "758965c3-371c-4423-a169-b926d5b20cc3",
+      "allocated": true,
+      "allocation_time": 14.026307106018066,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:35:04.469775"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "acd1ffe9-e27e-4da8-9523-74526797c56b",
+      "allocated": true,
+      "allocation_time": 14.28282117843628,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:36:19.774308"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "abbf193d-fc9d-4086-85ae-577b4cce30bf",
+      "allocated": true,
+      "allocation_time": 14.176978826522827,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:37:34.973761"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "cfcef1bf-8218-4e3d-9da3-8698c17b528b",
+      "allocated": true,
+      "allocation_time": 14.836573362350464,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:38:50.832296"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "9332db17-671f-4ea8-af51-3cac8fea794b",
+      "allocated": true,
+      "allocation_time": 15.512060165405273,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:40:07.366364"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "b8c8d60e-3787-4563-944f-f733450c7b3b",
+      "allocated": true,
+      "allocation_time": 14.577183961868286,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:41:22.965385"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "bea9c09d-57d9-428f-82f9-08f08b49f245",
+      "allocated": true,
+      "allocation_time": 16.550647020339966,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:42:40.537086"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "744f08e3-f682-4dd9-b559-c0b23cbe8135",
+      "allocated": true,
+      "allocation_time": 16.785937070846558,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:43:58.345000"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "3bb219a6-b2e8-4179-ac20-7782a4b96c7e",
+      "allocated": true,
+      "allocation_time": 17.30048394203186,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:45:16.666711"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "6219e64f-6bc5-489b-9419-0cf133aba3f3",
+      "allocated": true,
+      "allocation_time": 15.113066911697388,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:46:32.803041"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "8cc8cf5f-abe3-4508-b82e-d063e4085d31",
+      "allocated": true,
+      "allocation_time": 14.731264352798462,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:47:48.555328"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "62d23ffc-2e3a-4311-bcc8-424cef06659f",
+      "allocated": true,
+      "allocation_time": 14.32097315788269,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:49:03.897800"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "1e89e19e-8c37-409e-a0d2-22e17de5480c",
+      "allocated": true,
+      "allocation_time": 14.879199504852295,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:50:19.798285"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "ae7c546e-4754-4c2d-8e01-fd72112ce758",
+      "allocated": true,
+      "allocation_time": 14.999579906463623,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:51:35.819288"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "58403f05-2139-4f27-bbe5-901c4d772081",
+      "allocated": true,
+      "allocation_time": 14.856040000915527,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:52:51.696814"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "fc03ac79-93c7-49e7-a4a4-7852c50b6247",
+      "allocated": true,
+      "allocation_time": 14.681681156158447,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:54:07.400701"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "47bd6030-6d01-4038-b4ce-51b1aba85692",
+      "allocated": true,
+      "allocation_time": 19.5212185382843,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:55:27.943635"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "20420340-b6e9-42f2-baf2-2b6da7e123db",
+      "allocated": true,
+      "allocation_time": 15.695508003234863,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:56:44.660594"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "fc91d707-ab81-4094-a2a0-7bf44af9f7ba",
+      "allocated": true,
+      "allocation_time": 14.944125652313232,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:58:00.626236"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "887e1b6d-c8ba-40a5-94c6-e97c6fd46f3f",
+      "allocated": true,
+      "allocation_time": 15.24502444267273,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T14:59:16.892468"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "3712a229-c3b4-41b7-8970-e8c8bef18178",
+      "allocated": true,
+      "allocation_time": 16.779281854629517,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:00:34.692780"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "2bee0464-5802-46ae-8ec2-bf0985b1943c",
+      "allocated": true,
+      "allocation_time": 14.869333744049072,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:01:50.583868"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "a44c417d-ddc8-40ee-8428-e10c5ca57b5a",
+      "allocated": true,
+      "allocation_time": 15.57153034210205,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:03:07.175993"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "66305aab-8e33-4d54-bc1b-181472984bec",
+      "allocated": true,
+      "allocation_time": 14.842353820800781,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:04:23.041807"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "cc004da0-7ba9-426c-b45c-988183d857db",
+      "allocated": true,
+      "allocation_time": 15.31578779220581,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:05:39.378627"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "28a0a2f1-e79a-4c29-9f64-f807f3f4aadd",
+      "allocated": true,
+      "allocation_time": 16.716846227645874,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:06:57.116679"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "1089c022-65c0-4f26-9c63-caa9c5492d75",
+      "allocated": true,
+      "allocation_time": 18.354309558868408,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:40:43.361822"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "51332de2-f86f-4427-8381-a01cd22bcc93",
+      "allocated": true,
+      "allocation_time": 14.686595916748047,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:41:59.070800"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "bcab26ae-6c70-4b0b-a4f1-747673c49504",
+      "allocated": true,
+      "allocation_time": 16.268319129943848,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:43:16.361477"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "beca1c13-6ed2-419f-99d6-6e2d55137be6",
+      "allocated": true,
+      "allocation_time": 16.864641189575195,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:44:34.247742"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "9e0dc611-50b9-4d8d-8e9c-d66e4f37abd6",
+      "allocated": true,
+      "allocation_time": 14.384251832962036,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:45:49.653988"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "6cd676d0-fcaf-4f23-8c26-108bea74ced6",
+      "allocated": true,
+      "allocation_time": 14.836037397384644,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:47:05.512449"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "bbadbe1c-cd9c-4db6-8554-00e12f4caccd",
+      "allocated": true,
+      "allocation_time": 13.865650415420532,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:48:20.401787"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "e880b72d-17c3-4515-8cd6-ba7fbb28be76",
+      "allocated": true,
+      "allocation_time": 14.102880716323853,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:49:35.529324"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "edd6df3e-c8a9-4710-9bab-c824d8adb659",
+      "allocated": true,
+      "allocation_time": 14.480027675628662,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:50:51.031320"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "a7f9d22a-bddb-4dd8-995e-381c3b6a8c1e",
+      "allocated": true,
+      "allocation_time": 14.1797194480896,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:52:06.233036"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "abc1d452-ce25-4e9f-83de-823c3510fa8d",
+      "allocated": true,
+      "allocation_time": 14.674951791763306,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:53:21.931763"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "d054587b-b13d-483a-89fc-4f7349df3aab",
+      "allocated": true,
+      "allocation_time": 14.355741739273071,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:54:37.310456"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "794d39c2-c20c-4bc3-9d3d-b3f6c90590bb",
+      "allocated": true,
+      "allocation_time": 15.401904821395874,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:55:53.734392"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "a91f2404-0a11-4261-afd4-16182a1b27c2",
+      "allocated": true,
+      "allocation_time": 15.191138744354248,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:57:09.947217"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "f326984b-4ba0-4525-8e7a-ee84fa721bb3",
+      "allocated": true,
+      "allocation_time": 15.151228666305542,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:58:26.120965"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "81ccecd6-7697-4d1a-8d37-424df4a09178",
+      "allocated": true,
+      "allocation_time": 14.718689680099487,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T15:59:41.861022"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "607639e2-2a31-41ce-b5f8-26f46554e3c4",
+      "allocated": true,
+      "allocation_time": 15.564082860946655,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:00:58.448805"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "42261b26-0cef-4460-b814-64fffcd85f93",
+      "allocated": true,
+      "allocation_time": 14.959608316421509,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:02:14.430310"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "e43e525f-6e61-48e7-8f2b-cc52456eca5e",
+      "allocated": true,
+      "allocation_time": 15.25365924835205,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:03:30.705995"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "02dc7e24-3084-40f8-9107-2214d25845bd",
+      "allocated": true,
+      "allocation_time": 16.03364062309265,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:04:47.761793"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "9905be6a-23f3-4d3b-81c1-9c8f20f0ee6a",
+      "allocated": true,
+      "allocation_time": 16.939804315567017,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:06:05.723794"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "45ebdd97-5e11-49b9-b0d0-e22cf76e21d9",
+      "allocated": true,
+      "allocation_time": 15.935626983642578,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:07:22.681847"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "a1c7db0b-fe68-4e7a-8e12-b526f0a02f84",
+      "allocated": true,
+      "allocation_time": 15.445030450820923,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:08:39.147643"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "9c7b2b6f-4fce-481c-b929-8d59199de5c9",
+      "allocated": true,
+      "allocation_time": 15.257105350494385,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:09:55.437883"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "34840dd6-de6f-4a4d-9ebf-93c39f944a1f",
+      "allocated": true,
+      "allocation_time": 16.93373942375183,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:11:13.392949"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "f12e89c9-3985-4388-8250-91b35b4358fa",
+      "allocated": true,
+      "allocation_time": 15.214057445526123,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:12:29.628197"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "0c7aa1d9-d4d7-4ce1-a033-00f6f063c240",
+      "allocated": true,
+      "allocation_time": 15.660046100616455,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:13:46.309588"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "b6127f22-88a8-4584-9628-2a4600ce3979",
+      "allocated": true,
+      "allocation_time": 14.424288749694824,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:47:34.398342"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "6e1936a7-44b4-43c2-acc0-f88e5a4d509e",
+      "allocated": true,
+      "allocation_time": 16.924867868423462,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:48:52.344965"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "d21138f7-adec-475d-b9fd-50d8326a92e2",
+      "allocated": true,
+      "allocation_time": 18.25872778892517,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:50:11.625839"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "f9c4b304-07e3-4fc0-bd25-12410553a241",
+      "allocated": true,
+      "allocation_time": 16.23242688179016,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:51:28.879519"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "66d9386a-c0bf-4b4b-846b-253d5df5bdd4",
+      "allocated": true,
+      "allocation_time": 14.019340753555298,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:52:43.920709"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "087bef14-541f-4a74-966d-591b15140da1",
+      "allocated": true,
+      "allocation_time": 14.36704683303833,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:53:59.309150"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "623eb9a0-b459-47ff-87a8-0e1fc6ee9297",
+      "allocated": true,
+      "allocation_time": 14.71394681930542,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:55:15.044766"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "491e740d-6150-4c26-bffa-b49d53885cca",
+      "allocated": true,
+      "allocation_time": 14.78535008430481,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:56:30.854221"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "d348797f-4667-40c1-b1ce-34d4770281bf",
+      "allocated": true,
+      "allocation_time": 14.242373704910278,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:57:46.118932"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "4ff7542c-c3f9-4d30-b8ad-0760d0da3e65",
+      "allocated": true,
+      "allocation_time": 14.790336847305298,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T16:59:01.932656"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "fda67e6c-f667-496d-9e66-12852db10f65",
+      "allocated": true,
+      "allocation_time": 14.308666467666626,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:00:17.263230"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "cae2b32d-4f65-477a-aeb9-25ebb0c1452b",
+      "allocated": true,
+      "allocation_time": 14.164405584335327,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:01:32.448952"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "8357557c-1cf3-40bd-8d94-2c8f91f29746",
+      "allocated": true,
+      "allocation_time": 14.133489847183228,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:02:47.604480"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "bbebd21d-117c-4cfc-9239-815420c5701c",
+      "allocated": true,
+      "allocation_time": 13.850277423858643,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:04:02.476598"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "bb9b9905-bf98-41b2-990e-c0c8e3cfb666",
+      "allocated": true,
+      "allocation_time": 14.861502408981323,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:05:18.359644"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "dafad3a4-8a71-44a1-a130-37355efba477",
+      "allocated": true,
+      "allocation_time": 14.46248459815979,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:06:33.844612"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "1d3f2204-1bd2-4e4d-b35e-2f7a4637b59b",
+      "allocated": true,
+      "allocation_time": 14.56357479095459,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:07:49.429920"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "096c9bd1-0b1c-4f6e-a15b-0fe10b0296ab",
+      "allocated": true,
+      "allocation_time": 18.18756866455078,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:09:08.639593"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "7086a43a-7e7c-4004-bb62-b5c56a4457b7",
+      "allocated": true,
+      "allocation_time": 15.131199359893799,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:10:24.793281"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "fd235613-02e9-4938-9201-9624a336c6fb",
+      "allocated": true,
+      "allocation_time": 15.12099027633667,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:11:40.936539"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "9dcb8a75-f24e-49f4-b195-11ed62312d21",
+      "allocated": true,
+      "allocation_time": 15.183999300003052,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:12:57.152363"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "927e817e-a6fa-4464-8468-85d24ccaba4c",
+      "allocated": true,
+      "allocation_time": 15.730971097946167,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:14:13.904692"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "6b21a8f3-94d5-4286-84c7-5bac95d81ddf",
+      "allocated": true,
+      "allocation_time": 15.77402925491333,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:15:30.699609"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "38242fae-ef88-4160-9b87-025f3695c78e",
+      "allocated": true,
+      "allocation_time": 14.877867698669434,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:16:46.599326"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "09d2173f-56ca-44a0-8bde-b1c65c016647",
+      "allocated": true,
+      "allocation_time": 15.007872104644775,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:18:02.629196"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "0455ab76-3878-4dce-960b-8354115e49a7",
+      "allocated": true,
+      "allocation_time": 16.160797357559204,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:19:19.811821"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "1853586d-6aae-4028-aa07-8c3b44cb1e3d",
+      "allocated": true,
+      "allocation_time": 16.356114387512207,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:20:37.191082"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "47cbf036-05c2-4e82-a868-dcc7418dafe5",
+      "allocated": true,
+      "allocation_time": 15.279625415802002,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:54:32.879487"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "4edfae9d-3dd2-4363-b88b-29ebcb8770df",
+      "allocated": true,
+      "allocation_time": 13.982543706893921,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:55:47.884280"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "55cc5cf2-1607-41f3-b3e6-ec1d45d7bb68",
+      "allocated": true,
+      "allocation_time": 14.37317180633545,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:57:03.279298"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "81030019-03a9-4023-9a94-45217178229c",
+      "allocated": true,
+      "allocation_time": 14.208263158798218,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:58:18.510111"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "c10d09a8-1e75-4cfc-ac7a-63974702f951",
+      "allocated": true,
+      "allocation_time": 17.13769817352295,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T17:59:36.669813"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "69f8a5cb-b730-46fa-8224-8d65498eb004",
+      "allocated": true,
+      "allocation_time": 16.903822898864746,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:00:54.597701"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "cdd9f8c3-f6d4-4f18-92f9-daf1014cd3bb",
+      "allocated": true,
+      "allocation_time": 14.278025388717651,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:02:09.897526"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "49ba33e5-3b01-475e-b2bd-878c28edbb2d",
+      "allocated": true,
+      "allocation_time": 14.739970922470093,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:03:25.662109"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "8d357d3b-3f34-4032-944b-1a5996553480",
+      "allocated": true,
+      "allocation_time": 15.232890605926514,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:04:41.916645"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "7500d59d-c8d3-43e3-98e8-f1cf295187e8",
+      "allocated": true,
+      "allocation_time": 16.434348821640015,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:05:59.373140"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "dd92b251-f0d3-4680-bf5d-d06f98583f2a",
+      "allocated": true,
+      "allocation_time": 14.990756511688232,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:07:15.395117"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "3fdd50b2-d369-4d07-9a2d-5d93faf33a61",
+      "allocated": true,
+      "allocation_time": 14.599021196365356,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:08:31.015501"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "cae0e9f5-8241-4b53-9fd8-9ffd94ac5f60",
+      "allocated": true,
+      "allocation_time": 15.57051396369934,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:09:47.607702"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "49d22511-88d7-4dfe-8101-7f64d3a61833",
+      "allocated": true,
+      "allocation_time": 14.624346733093262,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:11:03.253809"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "94a7b959-eb4e-4d25-912c-26a65f18ccf6",
+      "allocated": true,
+      "allocation_time": 14.818089723587036,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:12:19.093832"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "64140b84-9bbd-47cf-8328-3ca3e8e06d4c",
+      "allocated": true,
+      "allocation_time": 14.415071964263916,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:13:34.530387"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "09b1ac62-cdfe-4fd7-a9ac-a8780994ed96",
+      "allocated": true,
+      "allocation_time": 15.411282062530518,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:14:50.962626"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "abcb095c-cd64-42d6-80d9-0f48a8e88f88",
+      "allocated": true,
+      "allocation_time": 14.958556175231934,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:16:06.942803"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "d8141b99-3aea-48fb-9d3a-f10dd0ee1536",
+      "allocated": true,
+      "allocation_time": 16.907658338546753,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:17:24.871848"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "b15ba10c-a519-47b2-b5bc-6efaf984ca8d",
+      "allocated": true,
+      "allocation_time": 14.424137115478516,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:18:40.317692"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "1b3ad14a-965f-4802-baa2-6a3b7d9fb212",
+      "allocated": true,
+      "allocation_time": 15.79062557220459,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:19:57.129932"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "daff9ab1-c050-41d6-8f52-7620617c72c2",
+      "allocated": true,
+      "allocation_time": 14.731373310089111,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:21:12.882496"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "61dc108b-1854-4036-846e-e4719cf7c649",
+      "allocated": true,
+      "allocation_time": 14.931106090545654,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:22:28.834363"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "09365f2a-e66a-47e1-ae52-8ca8252479e9",
+      "allocated": true,
+      "allocation_time": 15.046259641647339,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:23:44.902221"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "7441edf3-1045-4877-97a3-bc3e8c636c0b",
+      "allocated": true,
+      "allocation_time": 15.090099811553955,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:25:01.014222"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "9dae5f59-e629-4e9c-b29a-6560b5c05c1f",
+      "allocated": true,
+      "allocation_time": 14.998156309127808,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:26:17.034320"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "8ff9ae59-4b0f-4d2e-a82e-058556c2e71c",
+      "allocated": true,
+      "allocation_time": 16.68114733695984,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T18:27:34.736937"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "9ee2f0d1-9aab-4e80-94d0-0e3dd58ce29e",
+      "allocated": true,
+      "allocation_time": 15.444328784942627,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:01:23.731153"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "5e24f4fa-7b31-4716-bcf0-e4258eaf959b",
+      "allocated": true,
+      "allocation_time": 14.531038999557495,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:02:39.283373"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "83062bb8-aa3d-4938-a57a-c956087794aa",
+      "allocated": true,
+      "allocation_time": 14.459368705749512,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:03:54.764096"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "fe749ee8-c6cd-4543-8ea9-3d63b3082f36",
+      "allocated": true,
+      "allocation_time": 14.323735237121582,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:05:10.109802"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "a9ca4d86-1c1c-4877-88da-966e2a9c4a8e",
+      "allocated": true,
+      "allocation_time": 14.444890975952148,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:06:25.576625"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "61486fb9-8dc1-49dd-9618-a4c60f557efc",
+      "allocated": true,
+      "allocation_time": 14.19476842880249,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:07:40.794111"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "3672773a-d9fb-4a55-80c8-0b1c7d52e19a",
+      "allocated": true,
+      "allocation_time": 16.910624980926514,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:08:58.727159"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "fff02fd6-9239-4b04-80c0-a0f192a233f9",
+      "allocated": true,
+      "allocation_time": 16.94247341156006,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:10:16.691639"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "b1c24e7b-ec40-4498-9238-b801c9c21951",
+      "allocated": true,
+      "allocation_time": 16.8694167137146,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:11:34.583378"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "efc3b7e8-bb11-4063-a931-fd255834603b",
+      "allocated": true,
+      "allocation_time": 20.328539609909058,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:12:55.933939"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "ec412980-b4fb-4f2b-8b34-cbcaca109fea",
+      "allocated": true,
+      "allocation_time": 15.833168745040894,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:14:12.793256"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "52f87ab8-960c-418b-a669-3368eb995090",
+      "allocated": true,
+      "allocation_time": 14.77031946182251,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:15:28.585168"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "91626d90-fca0-427b-aee5-2a6791d8ed9c",
+      "allocated": true,
+      "allocation_time": 15.526285886764526,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:16:45.133312"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "2d84e27a-eee6-4536-b279-ee5bf7c233bb",
+      "allocated": true,
+      "allocation_time": 15.834310293197632,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:18:01.988055"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "ac07d5bc-c17e-4d9b-9c65-724369013316",
+      "allocated": true,
+      "allocation_time": 15.340848922729492,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:19:18.351959"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "3f272c93-f4db-4c8a-89ac-2166f77373f2",
+      "allocated": true,
+      "allocation_time": 14.765007972717285,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:20:34.138179"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "f001e7cc-3b49-4cc7-921a-0247372c33f6",
+      "allocated": true,
+      "allocation_time": 14.8749680519104,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:21:50.035095"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "03eb104c-291c-470e-9072-9f573dab970d",
+      "allocated": true,
+      "allocation_time": 14.724560737609863,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:23:05.781961"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "5b91067b-b334-4149-93a8-52e53d00743f",
+      "allocated": true,
+      "allocation_time": 16.07507038116455,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:24:22.879421"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "9e0d1e2d-8c3b-43eb-a1aa-486404301a4b",
+      "allocated": true,
+      "allocation_time": 14.967968225479126,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:25:38.868450"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "a1109612-4c4c-4984-bba8-f0fac846b4bf",
+      "allocated": true,
+      "allocation_time": 16.25924301147461,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:26:56.149967"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "440a2fd1-8507-445a-8037-c91e28f093c8",
+      "allocated": true,
+      "allocation_time": 16.248632192611694,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:28:13.419801"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "45fd19e0-5e9e-47c9-a7ab-c6f9c3dbd2be",
+      "allocated": true,
+      "allocation_time": 15.37110185623169,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:29:29.812854"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "697494aa-3fa6-43e1-ad34-0b22a538267e",
+      "allocated": true,
+      "allocation_time": 14.392197847366333,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:30:45.226550"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "3ab0347c-107b-4c03-8a49-d4a7013ffde9",
+      "allocated": true,
+      "allocation_time": 16.963409662246704,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:32:03.211864"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "ee9a73b1-a33f-4cb8-85c0-c20f9b586efd",
+      "allocated": true,
+      "allocation_time": 14.811784505844116,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:33:19.045512"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "c3bde130-9497-4f49-8ad2-65bae42829ef",
+      "allocated": true,
+      "allocation_time": 15.42845869064331,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T19:34:35.495931"
+    },
+    {
+      "vm_name": "vm-1",
+      "server_id": "3bf541ad-c9c8-459f-87b6-1ee0dfd6db25",
+      "allocated": true,
+      "allocation_time": 14.730547189712524,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:08:16.463651"
+    },
+    {
+      "vm_name": "vm-2",
+      "server_id": "f8c1c2df-7b37-491b-a1e9-cba74f594f0c",
+      "allocated": true,
+      "allocation_time": 14.395591259002686,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:09:31.881053"
+    },
+    {
+      "vm_name": "vm-3",
+      "server_id": "3f9090c8-7832-4b1c-8f52-18097776ea64",
+      "allocated": true,
+      "allocation_time": 14.134292840957642,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:10:47.037485"
+    },
+    {
+      "vm_name": "vm-4",
+      "server_id": "74d5f34c-e0b3-40f0-ac98-08578ad8e284",
+      "allocated": true,
+      "allocation_time": 14.549981355667114,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:12:02.608712"
+    },
+    {
+      "vm_name": "vm-5",
+      "server_id": "34b28826-e841-4fe8-8329-22ea40e76b10",
+      "allocated": true,
+      "allocation_time": 14.337831735610962,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:13:17.969620"
+    },
+    {
+      "vm_name": "vm-6",
+      "server_id": "bcf429e3-d9b8-4efe-b499-9db48484c95d",
+      "allocated": true,
+      "allocation_time": 14.242277383804321,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:14:33.235152"
+    },
+    {
+      "vm_name": "vm-7",
+      "server_id": "01c19e55-a195-4210-9f8c-7a87dfeb4955",
+      "allocated": true,
+      "allocation_time": 14.857576847076416,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:15:49.114407"
+    },
+    {
+      "vm_name": "vm-8",
+      "server_id": "11c001e0-a550-410b-a201-099b34cdf756",
+      "allocated": true,
+      "allocation_time": 15.088002920150757,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:17:05.224174"
+    },
+    {
+      "vm_name": "vm-9",
+      "server_id": "a185cc59-d85d-48bd-9e0f-1c4b044350b1",
+      "allocated": true,
+      "allocation_time": 14.435137510299683,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:18:20.680955"
+    },
+    {
+      "vm_name": "vm-10",
+      "server_id": "05f1ff3d-5f5f-4fae-b6dd-fdb7be026286",
+      "allocated": true,
+      "allocation_time": 14.152629613876343,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:19:35.857815"
+    },
+    {
+      "vm_name": "vm-11",
+      "server_id": "9fe17a56-f475-4d05-b34b-9db263114ddc",
+      "allocated": true,
+      "allocation_time": 14.798234701156616,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:20:51.680626"
+    },
+    {
+      "vm_name": "vm-12",
+      "server_id": "8e36868d-6127-4a3b-a423-2ad2902c751e",
+      "allocated": true,
+      "allocation_time": 14.73480772972107,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:22:07.437337"
+    },
+    {
+      "vm_name": "vm-13",
+      "server_id": "341988b1-eb8f-404f-b071-4a19c5e1d568",
+      "allocated": true,
+      "allocation_time": 15.922969341278076,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:23:24.381773"
+    },
+    {
+      "vm_name": "vm-14",
+      "server_id": "93da2f76-30c4-40e2-b30c-3c6a86a5a005",
+      "allocated": true,
+      "allocation_time": 14.639704942703247,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:24:40.042499"
+    },
+    {
+      "vm_name": "vm-15",
+      "server_id": "2f2c415e-bf54-4070-94fe-5440312e475b",
+      "allocated": true,
+      "allocation_time": 15.046935558319092,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:25:56.110952"
+    },
+    {
+      "vm_name": "vm-16",
+      "server_id": "1f27dd00-abbe-4376-94a2-61cbbb3190f3",
+      "allocated": true,
+      "allocation_time": 15.879795551300049,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:27:13.013325"
+    },
+    {
+      "vm_name": "vm-17",
+      "server_id": "816e1e30-0266-4740-947a-f44e32b60fea",
+      "allocated": true,
+      "allocation_time": 14.728713989257812,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:28:28.764058"
+    },
+    {
+      "vm_name": "vm-18",
+      "server_id": "ce627068-fc6f-4627-a052-6fb9b3e5bb8d",
+      "allocated": true,
+      "allocation_time": 15.595358848571777,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:29:45.381103"
+    },
+    {
+      "vm_name": "vm-19",
+      "server_id": "cb753ef3-1eed-4f70-8d98-738b593820c6",
+      "allocated": true,
+      "allocation_time": 16.003109216690063,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:31:02.405096"
+    },
+    {
+      "vm_name": "vm-20",
+      "server_id": "efb168f6-fbe3-4361-a1d8-6ee9835499d2",
+      "allocated": true,
+      "allocation_time": 17.318003177642822,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:32:20.745495"
+    },
+    {
+      "vm_name": "vm-21",
+      "server_id": "f32dfcfc-c0fd-4f75-861e-dd30ca5d806a",
+      "allocated": true,
+      "allocation_time": 15.438411951065063,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:33:37.205764"
+    },
+    {
+      "vm_name": "vm-22",
+      "server_id": "7caca0b8-ffef-4e94-be52-002e7fca5c74",
+      "allocated": true,
+      "allocation_time": 14.716855525970459,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:34:52.944946"
+    },
+    {
+      "vm_name": "vm-23",
+      "server_id": "c287df7d-bb7e-4617-8c4e-737408762b91",
+      "allocated": true,
+      "allocation_time": 16.36933946609497,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:36:10.340064"
+    },
+    {
+      "vm_name": "vm-24",
+      "server_id": "45ca7539-a6ac-4421-aa64-8488da7e989d",
+      "allocated": true,
+      "allocation_time": 16.122671604156494,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:37:27.484713"
+    },
+    {
+      "vm_name": "vm-25",
+      "server_id": "3f70e31b-6c0b-4597-b891-541e7d30b14a",
+      "allocated": true,
+      "allocation_time": 14.981029510498047,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:38:43.486812"
+    },
+    {
+      "vm_name": "vm-26",
+      "server_id": "fe97e002-4ddc-433c-bc0b-97ce0a8b6a05",
+      "allocated": true,
+      "allocation_time": 15.220882415771484,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:39:59.729015"
+    },
+    {
+      "vm_name": "vm-27",
+      "server_id": "94db2d76-a193-4a5f-a245-e0b700c79771",
+      "allocated": true,
+      "allocation_time": 16.751466512680054,
+      "sla_violation": false,
+      "timestamp": "2026-09-02T20:41:17.503069"
+    }
+  ],
+  "sla_violations": 0,
+  "final_status": {
+    "hosts": [
+      {
+        "id": 1,
+        "hostname": "compute1",
+        "state": "up",
+        "vms": 9,
+        "ram": 72.45
+      },
+      {
+        "id": 2,
+        "hostname": "compute2",
+        "state": "up",
+        "vms": 8,
+        "ram": 69.05
+      },
+      {
+        "id": 3,
+        "hostname": "compute3",
+        "state": "up",
+        "vms": 7,
+        "ram": 62.1
+      }
+    ],
+    "total_vms": 351,
+    "successful_allocations": 351,
+    "sla_violations": 0
+  }
+}

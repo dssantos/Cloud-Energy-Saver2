@@ -2,13 +2,12 @@
 """
 Análise de métricas do CES2 cruzando eventos + série temporal do cluster.
 
-Diferentemente do legado analyze_events.py (que só lia o JSON e produzia
-métricas fictícias de antecipação/atraso), este módulo cruza:
+Diferentemente do legado analyze_events.py (que só lia o JSON), este módulo cruza:
   - events_{model}_{ts}.json        (ações de wake/shutdown/sla/initial/final)
   - cluster_workload_{model}_{ts}.csv  (série temporal real: ram_avg, predicted_ram)
 
 para calcular, de forma real, quando a carga cruza os limiares:
-antecipação, atraso, ativações desnecessárias, tempo ativo, SLA e economia.
+atraso de shutdown, tempo ativo, SLA e economia de energia.
 
 Uso:
   python analyze_metrics.py \
@@ -18,7 +17,7 @@ Uso:
 
 Saídas:
   - analysis_<ts1>__vs__<ts2>__vs__<ts3>.json  (máquina)
-  - TCC_METRICS_<ts>.md                         (humano)
+  - TCC_METRICS_<ts>.md                         (humano)  [opcional]
 """
 
 import argparse
@@ -113,19 +112,6 @@ def _events_in_window(events, duration_h, csv_df):
 # Crossing detection on the ram_avg time series
 # ---------------------------------------------------------------------------
 
-def first_ascending_crossing(series, threshold, after_ts):
-    """First index where ram_avg crosses from < threshold to >= threshold, after after_ts."""
-    s = series[series.index >= after_ts].dropna()
-    if len(s) < 2:
-        return None
-    prev_below = (s.iloc[:-1] < threshold).values
-    curr_above = (s.iloc[1:] >= threshold).values
-    cross = np.where(prev_below & curr_above)[0]
-    if len(cross) == 0:
-        return None
-    return s.index[cross[0] + 1]
-
-
 def last_descending_crossing(series, threshold, before_ts):
     """Last index where ram_avg crosses from >= threshold to < threshold, before before_ts."""
     s = series[series.index <= before_ts].dropna()
@@ -142,34 +128,6 @@ def last_descending_crossing(series, threshold, before_ts):
 # ---------------------------------------------------------------------------
 # Metrics
 # ---------------------------------------------------------------------------
-
-def unnecessary_activations(events, csv_df, lim_max, duration_h):
-    """
-    % of wake events whose ram_avg did NOT exceed lim_max within
-    VALIDATION_WINDOW_MIN minutes after the wake (= wake not justified by load).
-
-    Note: a wake adds a fresh (low-RAM) host, which dilutes the mean and may
-    mask a genuinely necessary wake. Interpret with that caveat.
-    """
-    events = _events_in_window(events, duration_h, csv_df)
-    wakes = [e for e in events if e['event_type'] == 'wake']
-    if not wakes:
-        return 0.0
-    ram = csv_df['ram_avg']
-    window = timedelta(minutes=config.VALIDATION_WINDOW_MIN)
-    unnecessary = 0
-    for w in wakes:
-        try:
-            wts = ts(w['timestamp'])
-        except Exception:
-            continue
-        seg = ram[(ram.index >= wts) & (ram.index <= wts + window)]
-        seg = pd.to_numeric(seg, errors='coerce').dropna()
-        peaked = (seg.max() > lim_max) if not seg.empty else False
-        if not peaked:
-            unnecessary += 1
-    return (unnecessary / len(wakes)) * 100.0
-
 
 def late_shutdown_time(events, csv_df, lim_med, duration_h):
     """
@@ -191,30 +149,6 @@ def late_shutdown_time(events, csv_df, lim_med, duration_h):
         if cross is not None:
             lates.append((sts - cross).total_seconds() / 60.0)
     return (sum(lates) / len(lates)) if lates else 0.0
-
-
-def anticipation_time(events, csv_df, lim_max, duration_h):
-    """
-    Mean (first ascending crossing of lim_max after wake - wake_ts) in minutes,
-    for lstm_predictive wakes only. Measures how early the wake anticipated
-    the real threshold crossing. Returns 0.0 if no predictive wakes.
-    """
-    events = _events_in_window(events, duration_h, csv_df)
-    wakes = [e for e in events if e.get('event_type') == 'wake'
-             and e.get('trigger_type') == 'lstm_predictive']
-    if not wakes:
-        return 0.0
-    ram = pd.to_numeric(csv_df['ram_avg'], errors='coerce')
-    anticipations = []
-    for w in wakes:
-        try:
-            wts = ts(w['timestamp'])
-        except Exception:
-            continue
-        cross = first_ascending_crossing(ram, lim_max, wts)
-        if cross is not None:
-            anticipations.append((cross - wts).total_seconds() / 60.0)
-    return (sum(anticipations) / len(anticipations)) if anticipations else 0.0
 
 
 def _clip(a, b, start, end):
@@ -309,16 +243,12 @@ def energy_economy_3way(baseline_h, default_h, lstm_h, p):
 def analyze_scenario(events, csv_df, lim_max, lim_med, duration_h, baseline=False):
     if baseline:
         return {
-            'unnecessary_pct': 0.0,
             'late_shutdown_min': 0.0,
-            'anticipation_min': 0.0,
             'active_hours': round(total_active_hours_baseline(duration_h), 3),
             'sla_episodes': 0,
         }
     return {
-        'unnecessary_pct': round(unnecessary_activations(events, csv_df, lim_max, duration_h), 2),
         'late_shutdown_min': round(late_shutdown_time(events, csv_df, lim_med, duration_h), 2),
-        'anticipation_min': round(anticipation_time(events, csv_df, lim_max, duration_h), 2),
         'active_hours': round(total_active_hours_aligned(events, duration_h), 3),
         'sla_episodes': sla_episodes(events, csv_df, duration_h),
     }
@@ -344,9 +274,7 @@ def build_report(window, b, r, l, lim_max, lim_med):
 
     lines.append('| Métrica | Baseline | Default | LSTM |')
     lines.append('|---|---|---|---|')
-    lines.append(f"| Ativações desnecessárias (%) | {b['unnecessary_pct']:.1f} | {r['unnecessary_pct']:.1f} | {l['unnecessary_pct']:.1f} |")
     lines.append(f"| Atraso de shutdown (min) | {b['late_shutdown_min']:.2f} | {r['late_shutdown_min']:.2f} | {l['late_shutdown_min']:.2f} |")
-    lines.append(f"| Antecipação (min) | {b['anticipation_min']:.2f} | {r['anticipation_min']:.2f} | {l['anticipation_min']:.2f} |")
     lines.append(f"| Horas ativas (host·h) | {b['active_hours']:.2f} | {r['active_hours']:.2f} | {l['active_hours']:.2f} |")
     lines.append(f"| Episódios SLA | {b['sla_episodes']} | {r['sla_episodes']} | {l['sla_episodes']} |")
     lines.append('')
@@ -359,11 +287,7 @@ def build_report(window, b, r, l, lim_max, lim_med):
     lines.append('')
     lines.append('## Interpretação')
     lines.append('- **Baseline**: todos os hosts sempre ligados, sem verificador. Referência de consumo máximo e SLA zero.')
-    lines.append('- **Antecipação (LSTM)**: média de quão cedo o wake preditivo ocorreu antes '
-                 'do cruzamento real de lim_max.')
     lines.append('- **Atraso de shutdown**: quanto tempo após a carga cair abaixo de lim_med o host foi desligado.')
-    lines.append('- **Ativações desnecessárias**: % de wakes sem pico de carga acima de lim_max na janela de '
-                 f'{config.VALIDATION_WINDOW_MIN} min.')
     return '\n'.join(lines) + '\n'
 
 
@@ -401,13 +325,8 @@ def main():
 
     result = {
         'window': {'start': window['start_baseline'], 'duration_hours': round(dur, 3)},
-        'unnecessary_baseline': b['unnecessary_pct'],
-        'unnecessary_reactive': r['unnecessary_pct'],
-        'unnecessary_lstm': l['unnecessary_pct'],
         'late_shutdown_reactive_min': r['late_shutdown_min'],
         'late_shutdown_lstm_min': l['late_shutdown_min'],
-        'anticipation_reactive_min': r['anticipation_min'],
-        'anticipation_lstm_min': l['anticipation_min'],
         'baseline_hours': b['active_hours'],
         'reactive_hours': r['active_hours'],
         'lstm_active_hours': l['active_hours'],

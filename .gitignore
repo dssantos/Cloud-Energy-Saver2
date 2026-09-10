@@ -16,3 +16,8 @@ TCC_METRICS_*.md
 
 # Logs
 *.log
+# Experiment data committed for reproducibility (override the ignore rules above)
+!experiments/**/*.csv
+!experiments/**/events_*.json
+!experiments/**/analysis_*.json
+!experiments/**/*.log
