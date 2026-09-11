@@ -16,9 +16,12 @@ import ast
 import status
 import changestate
 import instances
-import verifier
 import registrator
 import host_recovery
+
+# N.B.: verifier (e, via predict_mv, o TensorFlow) é importado sob demanda
+# dentro dos métodos, para que as utilidades manuais (-r/-s/-sc/-on/-off)
+# continuem leves e rápidas de iniciar, como eram no antigo ces.py.
 
 
 class ExperimentOrchestrator:
@@ -262,6 +265,7 @@ class ExperimentOrchestrator:
 
 	def run_verification_only(self):
 		"""Run verifier in continuous mode without instantiator."""
+		import verifier
 		print('\n[VERIFY-ONLY] Iniciando verificação contínua...')
 		print(f'   Limite MAX: {self.lim_max}%')
 		print(f'   Limite MED: {self.lim_med}%')
@@ -313,7 +317,7 @@ class ExperimentOrchestrator:
 		lg = self._read_registered()
 
 		def _loop():
-			import csv, config, predict
+			import csv, config, predict, verifier
 			with open(cluster_file, 'w', newline='') as cf:
 				writer = csv.writer(cf)
 				per_host_cols = []
@@ -369,6 +373,7 @@ class ExperimentOrchestrator:
 
 	def start_verification(self):
 		"""Start verification loop in background thread."""
+		import verifier
 		print('\n[4/6] Iniciando verificação em background...')
 		import threading
 		from datetime import datetime
@@ -555,6 +560,7 @@ class ExperimentOrchestrator:
 		# Log final host state and stop LSTM training (meaningful only after a verification run;
 		# no-op in baseline mode since verifier was never started).
 		try:
+			import verifier
 			verifier.log_final_state()
 		except (AttributeError, Exception) as e:
 			print(f'   ! Erro ao logar estado final: {e}')
@@ -603,6 +609,7 @@ class ExperimentOrchestrator:
 					self._start_cluster_logging(ts)
 				if not self.cancelled:
 					try:
+						import verifier
 						verifier.log_initial_state()
 					except Exception:
 						pass
@@ -656,8 +663,65 @@ class ExperimentOrchestrator:
 				self.save_final_status()
 
 
+# ---------------------------------------------------------------------------
+# Utilidades manuais (centralizadas do antigo ces.py; ces.py agora é apenas
+# um atalho que repassa os argumentos para cá)
+# ---------------------------------------------------------------------------
+
+def run_status_loop():
+	"""Exibe status dos computes, atualizando a cada 10s (Ctrl+C p/ sair)."""
+	from time import sleep
+	while True:
+		try:
+			hosts = status.get()
+			if len(hosts) < 1:
+				print("There are no registered Compute hosts!\nRun 'python orchestrator.py -r' to register them")
+			else:
+				print("[Compute Hosts Status]\n")
+				for host in hosts:
+					print('%s [%s]' % (host['hostname'], host['state']))
+					print('RAM: {} %'.format(host['ram']))
+					try:
+						print('VMs: %s\n' % host['vms'])
+					except:
+						pass
+		except:
+			pass
+		sleep(10)
+
+
+def run_scoreboard_loop(top_n=5):
+	"""Exibe o placar dos modelos LSTM multivariados (Ctrl+C p/ sair)."""
+	from time import sleep
+	import scoreboard
+	while True:
+		try:
+			data = scoreboard.get(top_n=top_n)
+			totals = scoreboard.total_models()
+			print('[Scoreboard - LSTM multivariado]\n')
+			if not data:
+				print('Nenhum modelo/placar encontrado '
+				      '(o modo lstm ainda não pontuou).')
+			for host, entries in data.items():
+				total = totals.get(host, len(entries))
+				print('--- %s (TOP %d de %d modelos) ---' % (host, len(entries), total))
+				for i, e in enumerate(entries):
+					mark = '  <-- winner' if i == 0 else ''
+					recent = e.get('recent_err')
+					r = '-' if recent is None else '%.2f' % recent
+					print('  RMSE %-8.3f  mean %-6.2f  n %-4d  recent %-6s  eff %-8.3f  %s%s' % (
+						e['rmse'], e['mean_err'], e['n'], r, e['effective'], e['filename'], mark))
+				print('')
+		except Exception as ex:
+			print('Erro ao ler o placar: %s' % ex)
+		sleep(10)
+
+
 def main():
-	parser = argparse.ArgumentParser(description='CES Experiment Orchestrator')
+	parser = argparse.ArgumentParser(
+		description='CES Experiment Orchestrator',
+		epilog='Utilidades manuais (-r/-s/-sc/-on/-off) executam e saem; '
+		       'ces.py é um atalho que repassa os argumentos para cá.')
 	parser.add_argument('--lim-max', type=float, default=70, help='Limite máximo de RAM (%%)')
 	parser.add_argument('--lim-med', type=float, default=30, help='Limite médio de RAM (%%)')
 	parser.add_argument('--model', default='default', choices=['default', 'naive', 'arima', 'lstm', 'baseline'])
@@ -668,7 +732,38 @@ def main():
 	parser.add_argument('--verify-only', action='store_true', help='Executar apenas verificação contínua')
 	parser.add_argument('--instantiator-only', action='store_true', help='Executar apenas criação/deleção de VMs')
 
+	# Utilidades manuais (ex-ces.py)
+	parser.add_argument('-r', '--registrator', action='store_true', help='identifica e registra hosts')
+	parser.add_argument('-s', '--status', action='store_true', help='mostra status dos computes (refresh 10s)')
+	parser.add_argument('-sc', '--scoreboard', nargs='?', const=5, type=int, metavar='N',
+	                    help='mostra o top N de modelos LSTM por host (padrão 5, refresh 10s)')
+	parser.add_argument('-on', '--on', type=int, metavar='QT', help='liga uma quantidade QT de instâncias')
+	parser.add_argument('-off', '--off', type=int, metavar='QT', help='desliga uma quantidade QT de instâncias')
+	# Aliases das antigas flags do ces.py
+	parser.add_argument('-v', '--verifier', action='store_true', help='alias para --verify-only')
+	parser.add_argument('-i', '--instantiator', action='store_true', help='alias para --instantiator-only')
+	parser.add_argument('-o', '--orchestrator', action='store_true', help='alias para o experimento completo (padrão)')
+
 	args = parser.parse_args()
+
+	# Utilidades manuais: executam e saem, sem iniciar experimento
+	manual = (args.registrator or args.status or args.scoreboard is not None
+	          or args.on is not None or args.off is not None)
+	if manual:
+		try:
+			if args.registrator:
+				registrator.run()
+			elif args.status:
+				run_status_loop()
+			elif args.scoreboard is not None:
+				run_scoreboard_loop(args.scoreboard)
+			elif args.on is not None:
+				instances.on(args.on)
+			elif args.off is not None:
+				instances.off(args.off)
+		except KeyboardInterrupt:
+			print('\n! Interrompido')
+		return
 
 	orchestrator = ExperimentOrchestrator(
 		lim_max=args.lim_max,
@@ -677,8 +772,8 @@ def main():
 		num_vms=args.num_vms,
 		experiment_duration_hours=args.duration,
 		wake_only=args.wake_only,
-		verify_only=args.verify_only,
-		instantiator_only=args.instantiator_only
+		verify_only=args.verify_only or args.verifier,
+		instantiator_only=args.instantiator_only or args.instantiator
 	)
 
 	print('='*60)
