@@ -16,6 +16,18 @@ TCC_METRICS_*.md
 
 # Logs
 *.log
+
+# Backup local de artefatos de execução (ver backup/README.md)
+/backup/
+
+# Artefatos de execução que ainda poluem o status se caírem na raiz
+/experiment_results_*.json
+/stat_results_*.json
+/eval_mv*.json
+/eval_mv*.log
+/experimento_3way_tcc*.zip
+/backup_models*/
+
 # Experiment data committed for reproducibility (override the ignore rules above)
 !experiments/**/*.csv
 !experiments/**/events_*.json
