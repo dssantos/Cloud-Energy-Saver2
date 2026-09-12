@@ -14,7 +14,19 @@ experiments/<YYYYMMDD>/
 │   ├── crashed_hosts.json                                         # crashed host registry
 │   ├── analysis_<ts1>__vs__<ts2>__vs__<ts3>.json                  # comparative analysis
 │   └── experiment_run_<timestamp>.log                             # full run log
+├── models/
+│   └── <host>/<rmse>_<ts>_<hp>_6ahead.keras{,.norm.json}          # one model per host
+├── workload/
+│   └── workload_<host>.csv                                        # per-host RAM series, run window
+├── predictions/
+│   ├── predict_from_workload.py                                   # rebuilds the per-host predictions
+│   └── predictions_<host>.csv                                     # predicted vs real RAM per host
+├── plot_predictions.py                                            # renders the predicted vs real figure
+└── predicted_vs_real.png                                          # RAM predicted vs real, per host
 ```
+
+The models under `models/` are the best in-service model of each host, as ranked by
+`scoreboard.json`. Each run folder has its own README with the predicted vs real figure.
 
 ## How to reproduce
 
@@ -73,8 +85,8 @@ How to read the results:
 
 ## Available runs
 
-| Folder | Period | Modes | Order |
-|--------|--------|-------|-------|
-| `20260903/` | Sep 1–3, 2026 | 3 × 14 h | lstm → default → baseline |
+| Run | Period | Modes | Order |
+|-----|--------|-------|-------|
+| [20260903](20260903/) | Sep 1–3, 2026 | 3 × 14 h | lstm → default → baseline |
 
 The 20260903 data is the dataset used in the thesis (aligned 14 h window per mode).

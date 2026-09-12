@@ -33,3 +33,9 @@ TCC_METRICS_*.md
 !experiments/**/events_*.json
 !experiments/**/analysis_*.json
 !experiments/**/*.log
+
+# Best in-service models per host, kept with the run for reproducibility of
+# the offline replay (the full set from the random search is not committed)
+!experiments/**/models/
+!experiments/**/models/**/*.keras
+!experiments/**/models/**/*.norm.json
