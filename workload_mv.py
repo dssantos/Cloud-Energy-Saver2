@@ -19,6 +19,7 @@ from pandas import DataFrame
 
 import ram_usage
 import host_metrics
+import config
 
 COLUMNS = ['time_stamp', 'mem', 'vms', 'secs_since_vm_created',
            'secs_since_vm_deleted', 'swap', 'loadavg']
@@ -27,7 +28,7 @@ MV_DIR = 'workload_mv'
 
 
 def save(hostname):
-    """Continuously sample multivariate metrics for a host every 30s."""
+    """Continuously sample multivariate metrics for a host every MV_SAMPLE_INTERVAL_S."""
     try:
         makedirs(MV_DIR, exist_ok=True)
     except Exception:
@@ -51,4 +52,4 @@ def save(hostname):
                     df.to_csv(f, header=f.tell() == 0, index=False)
         except Exception:
             pass
-        sleep(30)
+        sleep(config.MV_SAMPLE_INTERVAL_S)

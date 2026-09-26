@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import predict
 import workload_mv, predict_mv
 import event_logger
+import predict_log
 import host_metrics
 import host_recovery
 import config
@@ -195,7 +196,14 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
     emergency branch means *installed* overload (per plan). Otherwise, in lstm mode,
     high predictions would set normal==0 and shadow the lstm_predictive wake branch.
     ram_val (the prediction) is still used for avg_ram (the decision metric).
+
+    Every model output is also recorded in the prediction history (predict_log):
+    previsto x real no instante-alvo (t + STEPS_AHEAD amostras), base das métricas
+    de erro do TCC. No modelo default a "predição" é a leitura do momento
+    (persistência) — baseline de erro. Quando o LSTM não tem modelo/dados (mv_pred
+    None) NADA é registrado para o host, para não poluir o histórico com fallback.
     """
+    base_model = config.base_model(predict_model)
     ram_values = []
     overloaded = []
     normal = []
@@ -207,7 +215,7 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
             actual = host['ram']
             actual_values.append(actual)  # live reading (real load)
             ram_val = actual
-            if predict_model == 'lstm':
+            if base_model == 'lstm':
                 # Multivariate pipeline: única fonte de predição. Sem modelo/dados
                 # disponíveis -> mantém ram_val = atual e não alimenta avg_predicted.
                 try:
@@ -218,10 +226,18 @@ def calculate_ram_average(hosts_data, lim_max, predict_model='default'):
                 if mv_pred is not None:
                     ram_val = mv_pred
                     predicted_values.append(ram_val)
-            elif predict_model == 'naive':
+                    predict_log.record(host['hostname'], predict_model, mv_pred,
+                                       model_file=predict_mv.current_model_filename(host['hostname']),
+                                       mem_now=actual)
+            elif base_model == 'naive':
                 ram_val = predict.naive(host['hostname'])
-            elif predict_model == 'arima':
+                predict_log.record(host['hostname'], predict_model, ram_val, mem_now=actual)
+            elif base_model == 'arima':
                 ram_val = predict.arima(host['hostname'])
+                predict_log.record(host['hostname'], predict_model, ram_val, mem_now=actual)
+            else:
+                # default: persistência (a própria leitura atual) -> baseline de erro
+                predict_log.record(host['hostname'], predict_model, ram_val, mem_now=actual)
 
             # Classify by ACTUAL ram -> emergency = installed overload (not predicted).
             if actual > lim_max:
@@ -322,6 +338,11 @@ def log_final_state():
 def run(lim_max, lim_med, predict_model):
     global sla_violating_hosts
 
+    # Sufixo '_tend' (lstm_tend/default_tend) liga o gate de tendência do nº de
+    # VMs nas decisões abaixo; sem o sufixo, decide só pelos limiares/leitura.
+    use_trend = config.uses_trend(predict_model)
+    base_model = config.base_model(predict_model)
+
     hosts = status.get()
 
     # Track the cluster's total VM count to detect the instantiator's create/delete phase.
@@ -411,9 +432,9 @@ def run(lim_max, lim_med, predict_model):
 ## Logic of the management of the hosts to be turned on and off
 
     # PREDICTIVE (lstm only): prediction > lim_max but real load still <= lim_max -> wake early
-    if (predict_model == 'lstm' and avg_predicted is not None
+    if (base_model == 'lstm' and avg_predicted is not None
           and avg_predicted > lim_max and avg_actual <= lim_max
-          and _vms_rising()
+          and (not use_trend or _vms_rising())
           and len(idle) == 0 and len(offline) > 0):
         predictive_host = select_wake_host(offline)
         print(f'PREDITIVO: previsão LSTM {avg_predicted:.1f}% > {lim_max}% (real {avg_actual:.1f}%). Acordando {predictive_host}...')
@@ -435,7 +456,7 @@ def run(lim_max, lim_med, predict_model):
 
     # REACTIVE: real load > lim_max, no idle buffer, offline available -> wake (default mode wakes here)
     elif (avg_actual > lim_max
-          and _vms_rising()
+          and (not use_trend or _vms_rising())
           and len(idle) == 0 and len(offline) > 0):
         reactive_host = select_wake_host(offline)
         print(f'REATIVO: carga real {avg_actual:.1f}% > {lim_max}%. Acordando {reactive_host}...')
@@ -463,7 +484,7 @@ def run(lim_max, lim_med, predict_model):
             print(f'Carga alta ({avg_actual:.1f}%) — sem idle/offline: {_fmt(running)} — limite de capacidade.')
     else:
         if len(idle) > 0:
-            if _vms_rising():
+            if use_trend and _vms_rising():
                 print(f'Idle {_fmt(idle)} mantido — nº de VMs subindo (carga a caminho).')
             elif ram_avg >= lim_med:				## If RAM is between the medium and maximum limits
                 # Keep at least 1 host
@@ -535,15 +556,20 @@ def start(lim_max, lim_med, predict_model, continuous=False):
     global lstm_manager, experiment_start_time
 
     # Initialize event logger with model-specific filename
-    event_file = f'events_{predict_model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    event_file = f'events_{predict_model}_{ts}.json'
     event_logger.logger = event_logger.EventLogger(event_file)
     print(f'Event logging initialized: {event_file}')
+
+    # Histórico de predições (previsto x real no alvo) p/ métricas de erro do TCC
+    predict_log.set_file(f'predictions_{predict_model}_{ts}.csv')
+    print(f'Prediction logging initialized: predictions_{predict_model}_{ts}.csv')
 
     # Log initial state
     log_initial_state()
 
     # Initialize multivariate LSTM training if needed
-    if predict_model == 'lstm':
+    if config.base_model(predict_model) == 'lstm':
         try:
             with open("registered.txt", "r") as file:
                 registered = ast.literal_eval(file.read())
@@ -560,6 +586,13 @@ def start(lim_max, lim_med, predict_model, continuous=False):
     hosts = status.get()
     for host in hosts:
         threading.Thread(target=workload_mv.save, args=[host['hostname']]).start()
+
+    # Coleta univariada ({hostname}.csv): fonte do naive/arima (último registro <= 90s)
+    if config.base_model(predict_model) in ('naive', 'arima'):
+        import workload
+        for host in hosts:
+            threading.Thread(target=workload.save, args=[host['hostname']], daemon=True).start()
+        print(f'Coleta univariada iniciada ({len(hosts)} hosts) — fonte do naive/arima')
 
     # Main verification loop
     try:
@@ -582,6 +615,6 @@ def start(lim_max, lim_med, predict_model, continuous=False):
         print('\n\nStopping verifier...')
         # Log final state before exiting
         log_final_state()
-        if predict_model == 'lstm':
+        if config.base_model(predict_model) == 'lstm':
             predict_mv.mv_manager.stop_training()
         raise

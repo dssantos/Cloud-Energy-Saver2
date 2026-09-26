@@ -93,8 +93,12 @@ class ExperimentOrchestrator:
 		return self.results['hosts_waked']
 
 	def _force_reset_host(self, host):
-		"""Força reset via VBoxManage no host Windows (poweroff + start)."""
+		"""Força reset via VBoxManage no host Windows (poweroff + start).
+		Comandos ssh SEPARADOS e sem redirects/separadores bash: o shell remoto
+		do sshd no Windows é o cmd.exe, onde 2>/dev/null, sleep e ';' não
+		funcionam (o poweroff falhava em silêncio e a VM nunca reciclava)."""
 		import os
+		import subprocess
 		wh = os.getenv('WINDOWS_HOST')
 		wu = os.getenv('WINDOWS_USER')
 		if not wh or not wu:
@@ -103,9 +107,11 @@ class ExperimentOrchestrator:
 		try:
 			print(f'   ⚡ Reset forçado VBoxManage: {host} (poweroff + startvm)')
 			host_recovery.mark_resetting(host)
-			__import__('subprocess').run(
-				f'ssh -o ConnectTimeout=10 {wu}@{wh} "VBoxManage controlvm {host} poweroff 2>/dev/null; sleep 3; VBoxManage startvm {host} --type=headless"',
-				shell=True, timeout=30, stdout=__import__('subprocess').DEVNULL, stderr=__import__('subprocess').DEVNULL)
+			subprocess.run(f'ssh -o ConnectTimeout=10 {wu}@{wh} "VBoxManage controlvm {host} poweroff"',
+			               shell=True, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+			time.sleep(5)
+			subprocess.run(f'ssh -o ConnectTimeout=10 {wu}@{wh} "VBoxManage startvm {host} --type=headless"',
+			               shell=True, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 		except Exception as e:
 			print(f'   ⚠ Reset falhou para {host}: {e}')
 
@@ -314,6 +320,12 @@ class ExperimentOrchestrator:
 		print(f'   Event logging: {event_file}')
 		print(f'   Cluster workload logging: {cluster_file}')
 
+		# Histórico de predições (previsto x real no alvo) p/ métricas de erro do TCC
+		import predict_log
+		predictions_file = f'predictions_{self.predict_model}_{ts}.csv'
+		predict_log.set_file(predictions_file)
+		print(f'   Prediction logging: {predictions_file}')
+
 		lg = self._read_registered()
 
 		def _loop():
@@ -333,7 +345,7 @@ class ExperimentOrchestrator:
 						up_rams = [h['ram'] for h in hosts if h.get('state') == 'up']
 						ram_avg = sum(up_rams) / len(up_rams) if up_rams else 0.0
 						predicted = None
-						if self.predict_model == 'lstm':
+						if config.base_model(self.predict_model) == 'lstm':
 							preds = []
 							for h in hosts:
 								if h.get('state') == 'up':
@@ -399,8 +411,20 @@ class ExperimentOrchestrator:
 		except Exception as e:
 			print(f'   ! Erro ao iniciar multivariate workload: {e}')
 
+		# Coleta univariada ({hostname}.csv na raiz): fonte do naive/arima
+		# (último registro se <= 90s; sem ela o naive degrada para persistência)
+		if config.base_model(self.predict_model) in ('naive', 'arima'):
+			try:
+				import workload
+				for hostname in registered:
+					threading.Thread(target=workload.save, args=[hostname], daemon=True).start()
+				print(f'   ✓ Univariate workload collection iniciado ({len(registered)} hosts) — fonte do naive/arima')
+			except Exception as e:
+				print(f'   ! Erro ao iniciar univariate workload: {e}')
+
 		# Multivariate LSTM training (única pipeline de predição do verifier)
-		if self.predict_model == 'lstm':
+		import config
+		if config.base_model(self.predict_model) == 'lstm':
 			try:
 				import predict_mv
 				predict_mv.mv_manager.reset_scores()  # fresh scoreboard for this run
@@ -565,7 +589,8 @@ class ExperimentOrchestrator:
 		except (AttributeError, Exception) as e:
 			print(f'   ! Erro ao logar estado final: {e}')
 		try:
-			if self.predict_model == 'lstm':
+			import config
+			if config.base_model(self.predict_model) == 'lstm':
 				import predict_mv
 				predict_mv.mv_manager.stop_training()
 		except Exception as e:
@@ -724,7 +749,9 @@ def main():
 		       'ces.py é um atalho que repassa os argumentos para cá.')
 	parser.add_argument('--lim-max', type=float, default=70, help='Limite máximo de RAM (%%)')
 	parser.add_argument('--lim-med', type=float, default=30, help='Limite médio de RAM (%%)')
-	parser.add_argument('--model', default='default', choices=['default', 'naive', 'arima', 'lstm', 'baseline'])
+	parser.add_argument('--model', default='default',
+	                    choices=['default', 'default_tend', 'naive', 'arima', 'lstm', 'lstm_tend', 'baseline'],
+	                    help="modelo de decisão; sufixo '_tend' liga o gate de tendência do nº de VMs")
 	parser.add_argument('--num-vms', type=int, default=27, help='Número de VMs para instanciar')
 	parser.add_argument('--duration', type=float, default=18, help='Duração do experimento (horas)')
 	parser.add_argument('--config', help='Arquivo de configuração JSON')

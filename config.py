@@ -34,6 +34,7 @@ LIM_MED = 30.0
 
 # --- Predição ---
 STEPS_AHEAD = 6  # 3 min à frente (cadência de coleta de 30s); melhor severidade SLA nos experimentos
+MV_SAMPLE_INTERVAL_S = 30  # cadência do workload_mv.save (s); alvo da predição = STEPS_AHEAD amostras à frente
 GAP_S = 90       # espaçamento máx. entre amostras de workload (s); >90s = 2+ amostras perdidas (crash/travamento)
 MAX_VMS_PER_HOST = 10  # host "cheio" com >= N VMs; usado na recuperação por falha de alocação
 
@@ -53,3 +54,19 @@ VM_TREND_MIN_DELTA = 1               # variação mínima (em VMs) para consider
 
 # --- SLA ---
 SLA_RAM_MARGIN_PCT = 10            # SLA #1 (ram_over_threshold): host > lim_max * (1 + this/100). Ex.: lim_max 80 -> 88%
+
+# --- Variantes de modelo com/sem gate de tendência do nº de VMs ---
+# O sufixo '_tend' liga o gate _vms_rising() nas decisões (wakes + manutenção de
+# idle): 'lstm_tend'/'default_tend' = com gate; 'lstm'/'default' = sem gate
+# (decidem só pelos limiares/leitura, em qualquer fase de create/delete).
+TREND_SUFFIX = '_tend'
+
+
+def base_model(model):
+    """Remove o sufixo de tendência: 'lstm_tend' -> 'lstm', 'default' -> 'default'."""
+    return model[:-len(TREND_SUFFIX)] if model.endswith(TREND_SUFFIX) else model
+
+
+def uses_trend(model):
+    """True se o modelo usa o gate de tendência do nº de VMs (sufixo '_tend')."""
+    return model.endswith(TREND_SUFFIX)

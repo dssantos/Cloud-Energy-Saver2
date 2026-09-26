@@ -75,12 +75,14 @@ done
 
 echo ""
 echo "=== ANALYZE (3-way: baseline vs default vs lstm) $(date) ==="
-BEvents=$(ls -t events_baseline_*.json 2>/dev/null | head -1)
-BCsv=$(ls -t cluster_workload_baseline_*.csv 2>/dev/null | head -1)
-REvents=$(ls -t events_default_*.json 2>/dev/null | head -1)
-RCsv=$(ls -t cluster_workload_default_*.csv 2>/dev/null | head -1)
-LEvents=$(ls -t events_lstm_*.json 2>/dev/null | head -1)
-LCsv=$(ls -t cluster_workload_lstm_*.csv 2>/dev/null | head -1)
+# Globs com [0-9]* : o timestamp começa com dígito, então events_default_[0-9]*
+# NÃO casa com events_default_tend_* (evita misturar variantes _tend na 3-way).
+BEvents=$(ls -t events_baseline_[0-9]*.json 2>/dev/null | head -1)
+BCsv=$(ls -t cluster_workload_baseline_[0-9]*.csv 2>/dev/null | head -1)
+REvents=$(ls -t events_default_[0-9]*.json 2>/dev/null | head -1)
+RCsv=$(ls -t cluster_workload_default_[0-9]*.csv 2>/dev/null | head -1)
+LEvents=$(ls -t events_lstm_[0-9]*.json 2>/dev/null | head -1)
+LCsv=$(ls -t cluster_workload_lstm_[0-9]*.csv 2>/dev/null | head -1)
 echo "baseline: $BEvents  /  $BCsv"
 echo "reactive: $REvents  /  $RCsv"
 echo "lstm    : $LEvents  /  $LCsv"
@@ -94,4 +96,15 @@ if [[ -n "$BEvents" && -n "$BCsv" && -n "$REvents" && -n "$RCsv" && -n "$LEvents
 else
   echo "ERROR: faltam arquivos de coleta para a análise."
 fi
+
+# Inventario completo (todas as variantes, inclusive _tend)
+echo ""
+echo "=== ARTEFATOS POR MODO (linhas) ==="
+for MODEL in $MODELS; do
+  ev=$(ls -t events_${MODEL}_[0-9]*.json 2>/dev/null | head -1)
+  cw=$(ls -t cluster_workload_${MODEL}_[0-9]*.csv 2>/dev/null | head -1)
+  pr=$(ls -t predictions_${MODEL}_[0-9]*.csv 2>/dev/null | head -1)
+  echo "$MODEL: events=$([ -n "$ev" ] && wc -l < "$ev" || echo 0) cluster=$([ -n "$cw" ] && wc -l < "$cw" || echo 0) predictions=$([ -n "$pr" ] && wc -l < "$pr" || echo 0)"
+  [ -n "$pr" ] && echo "   predictions: $pr"
+done
 echo "=== END $(date) ==="

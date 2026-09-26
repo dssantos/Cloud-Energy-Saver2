@@ -554,3 +554,13 @@ class MVLSTMTrainingManager:
 
 
 mv_manager = MVLSTMTrainingManager()
+
+
+def current_model_filename(hostname):
+    """Filename do modelo vencedor em cache para o host (None se nada carregado).
+
+    Não recarrega do disco nem re-ranqueia: só lê o cache populado por get_model.
+    """
+    with mv_manager._cache_lock:
+        cached = mv_manager._cache.get(hostname)
+    return cached[4] if cached else None
