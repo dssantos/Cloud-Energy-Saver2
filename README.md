@@ -147,7 +147,7 @@ python orchestrator.py --instantiator-only --num-vms 27
 ### Parameters
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--model` | `default` | Prediction model: `default`, `naive`, `arima`, `lstm` |
+| `--model` | `default` | Prediction model: `default`, `naive`, `arima`, `lstm`, `baseline` — any decision model also accepts the `_tend` suffix (`default_tend`, `lstm_tend`) to enable the VM-count trend gate |
 | `--lim-max` | `70` | Maximum RAM threshold (%) — triggers waking hosts |
 | `--lim-med` | `30` | Medium RAM threshold (%) — triggers shutting down hosts |
 | `--num-vms` | `27` | Number of VMs to create/delete per cycle |
@@ -165,6 +165,16 @@ python orchestrator.py --instantiator-only --num-vms 27
 - **naive**: Uses last known workload value (if recent) or current RAM
 - **arima**: ARIMA(1,0,1) model fitted to workload history
 - **lstm**: LSTM neural network with continuous background training
+- **baseline**: All hosts always on, no verifier — reference for energy/SLA comparisons
+- **`_tend` variants** (`default_tend`, `lstm_tend`): same models with the VM-count trend gate enabled on wake and idle-keeping decisions; the plain names decide purely by thresholds/current load
+
+## Prediction history and error metrics
+
+Every live prediction from every model is logged to `predictions_{model}_{timestamp}.csv`: the
+predicted value, the real mem% observed at the prediction instant (`mem_at_pred`) and at the
+target time (t + `STEPS_AHEAD` × 30s), plus the absolute error. `analyze_predictions.py`
+computes MAE, RMSE, MAPE, sMAPE, directional accuracy, R² and the skill scores MASE/MSESS
+(against the naive arm and against paired persistence) from these files.
 
 ## Experiment data
 
