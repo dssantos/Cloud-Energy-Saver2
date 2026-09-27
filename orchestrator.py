@@ -386,6 +386,7 @@ class ExperimentOrchestrator:
 	def start_verification(self):
 		"""Start verification loop in background thread."""
 		import verifier
+		import config  # usado por TODOS os ramos abaixo (naive/arima, lstm) — import no topo do método
 		print('\n[4/6] Iniciando verificação em background...')
 		import threading
 		from datetime import datetime
@@ -423,7 +424,6 @@ class ExperimentOrchestrator:
 				print(f'   ! Erro ao iniciar univariate workload: {e}')
 
 		# Multivariate LSTM training (única pipeline de predição do verifier)
-		import config
 		if config.base_model(self.predict_model) == 'lstm':
 			try:
 				import predict_mv
