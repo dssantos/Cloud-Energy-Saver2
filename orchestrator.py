@@ -593,8 +593,15 @@ class ExperimentOrchestrator:
 			if config.base_model(self.predict_model) == 'lstm':
 				import predict_mv
 				predict_mv.mv_manager.stop_training()
+				# Snapshot do placar com carimbo de tempo e nome do modelo executado
+				# (o scoreboard.json continua como arquivo de trabalho da sequência)
+				predict_mv.mv_manager.dump_scoreboard()
+				import shutil
+				sb = f'scoreboard_{self.predict_model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+				shutil.copyfile(predict_mv.SCOREBOARD_FILE, sb)
+				print(f'   ✓ Scoreboard salvo: {sb}')
 		except Exception as e:
-			print(f'   ! Erro ao parar LSTM training: {e}')
+			print(f'   ! Erro ao finalizar LSTM training/scoreboard: {e}')
 
 		self.results['end_time'] = datetime.now().isoformat()
 		self.verification_active = False
