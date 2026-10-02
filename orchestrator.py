@@ -537,7 +537,13 @@ class ExperimentOrchestrator:
 						break
 
 					print(f'desligando {vm_name}   ')
-					instances.off(1)  # Delete last VM
+					try:
+						instances.off(1)  # Delete last VM
+					except Exception as e:
+						# Falha transitória de delete (API/SSH) não pode abortar o braço:
+						# registra e segue para a próxima VM (a cleanup_vms do final
+						# da sequência remove o que sobrar).
+						print(f'   ⚠ delete de {vm_name} falhou ({e}); seguindo...')
 
 					self.print_progress(i + 1, self.num_vms, f'VMs deletadas: {i+1}/{self.num_vms}')
 
